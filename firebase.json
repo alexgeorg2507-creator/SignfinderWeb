@@ -1,0 +1,30 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "*.md",
+      "**/.*",
+      "TASK_*",
+      "index-cloud.html"
+    ],
+    "cleanUrls": false,
+    "rewrites": [
+      { "source": "/api/**", "run": { "serviceId": "signfinder-api", "region": "europe-west1" } },
+      { "source": "/app", "destination": "/app/index.html" },
+      { "source": "/app/**", "destination": "/app/index.html" },
+      { "source": "/en/enterprise", "destination": "/index-enterprise.html" },
+      { "source": "/ru/enterprise", "destination": "/index-enterprise.html" },
+      { "source": "/enterprise",    "destination": "/index-enterprise.html" },
+      { "source": "/en",            "destination": "/index.html" },
+      { "source": "/ru",            "destination": "/index.html" }
+    ],
+    "headers": [
+      {
+        "source": "**/*.html",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }]
+      }
+    ]
+  }
+}

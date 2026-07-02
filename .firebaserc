@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "signfinder-c1163",
+    "prod": "signfinder-c1163",
+    "test": "signfinder-cab-test"
+  }
+}

@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignFinder — Кабинет</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --c-bg: #f8f8f6;
+    --c-surface: #ffffff;
+    --c-border: #e4e4e0;
+    --c-text: #1a1a18;
+    --c-muted: #6b6b68;
+    --c-accent: #2563eb;
+    --c-accent-bg: #eff6ff;
+    --c-danger: #dc2626;
+    --c-success: #16a34a;
+    --c-success-bg: #f0fdf4;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--c-bg); color: var(--c-text); min-height: 100vh; font-size: 16px; line-height: 1.5; }
+
+  /* ── screens ── */
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* ── auth screen ── */
+  #screen-auth { align-items: center; justify-content: center; padding: 1.5rem; }
+  .auth-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 16px; padding: 2.5rem 2rem; max-width: 400px; width: 100%; box-shadow: var(--shadow); }
+  .auth-logo { font-size: 22px; font-weight: 600; margin-bottom: 0.5rem; }
+  .auth-sub { color: var(--c-muted); font-size: 14px; margin-bottom: 2rem; }
+  .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 0.75rem 1rem; border-radius: var(--radius); border: 1px solid var(--c-border); background: var(--c-surface); font-size: 15px; cursor: pointer; transition: background .15s; font-family: inherit; color: var(--c-text); }
+  .btn:hover { background: var(--c-bg); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-primary { background: var(--c-accent); color: #fff; border-color: var(--c-accent); }
+  .btn-primary:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
+  .divider { display: flex; align-items: center; gap: 0.75rem; margin: 1.25rem 0; color: var(--c-muted); font-size: 13px; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--c-border); }
+  .input { width: 100%; padding: 0.65rem 0.85rem; border: 1px solid var(--c-border); border-radius: var(--radius); font-size: 15px; font-family: inherit; color: var(--c-text); background: var(--c-surface); outline: none; transition: border-color .15s; margin-bottom: 0.75rem; }
+  .input:focus { border-color: var(--c-accent); }
+  .form-link { font-size: 13px; color: var(--c-accent); cursor: pointer; background: none; border: none; padding: 0; margin-top: 0.75rem; display: block; text-align: center; }
+
+  /* ── verify screen ── */
+  #screen-verify { align-items: center; justify-content: center; padding: 1.5rem; }
+  .verify-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 16px; padding: 2.5rem 2rem; max-width: 400px; width: 100%; text-align: center; }
+  .verify-card h2 { font-size: 20px; margin-bottom: 0.5rem; }
+  .verify-card p { color: var(--c-muted); font-size: 14px; margin-bottom: 1.5rem; line-height: 1.6; }
+
+  /* ── cabinet ── */
+  #screen-cabinet { flex-direction: column; }
+  .topbar { background: var(--c-surface); border-bottom: 1px solid var(--c-border); padding: 0 1.5rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .topbar-logo { font-size: 17px; font-weight: 600; }
+  .topbar-user { display: flex; align-items: center; gap: 0.75rem; font-size: 14px; color: var(--c-muted); }
+  .btn-logout { font-size: 13px; color: var(--c-muted); background: none; border: 1px solid var(--c-border); border-radius: 8px; padding: 0.35rem 0.75rem; cursor: pointer; font-family: inherit; }
+  .btn-logout:hover { background: var(--c-bg); }
+  .cabinet-layout { display: flex; flex: 1; min-height: 0; }
+  .sidebar { width: 220px; border-right: 1px solid var(--c-border); background: var(--c-surface); padding: 1rem 0; flex-shrink: 0; }
+  .nav-item { display: flex; align-items: center; gap: 0.65rem; padding: 0.65rem 1.25rem; font-size: 14px; cursor: pointer; color: var(--c-muted); border-left: 3px solid transparent; transition: all .15s; }
+  .nav-item:hover { background: var(--c-bg); color: var(--c-text); }
+  .nav-item.active { color: var(--c-accent); border-left-color: var(--c-accent); background: var(--c-accent-bg); }
+  .nav-icon { font-size: 18px; width: 20px; text-align: center; }
+  .main-content { flex: 1; padding: 2rem 1.5rem; max-width: 720px; overflow-y: auto; }
+  .section-title { font-size: 20px; font-weight: 600; margin-bottom: 0.25rem; }
+  .section-sub { color: var(--c-muted); font-size: 14px; margin-bottom: 1.5rem; }
+  .card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem; }
+  .stub { color: var(--c-muted); font-size: 14px; text-align: center; padding: 3rem 1rem; }
+
+  /* ── msg ── */
+  .msg { font-size: 13px; padding: 0.6rem 0.85rem; border-radius: 8px; margin-bottom: 0.75rem; display: none; }
+  .msg.error { background: #fef2f2; color: var(--c-danger); border: 1px solid #fecaca; display: block; }
+  .msg.info { background: var(--c-accent-bg); color: var(--c-accent); border: 1px solid #bfdbfe; display: block; }
+  .msg.success { background: var(--c-success-bg); color: var(--c-success); border: 1px solid #bbf7d0; display: block; }
+
+  /* ── signature tab extras ── */
+  .sig-grid { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .sig-col { flex: 1; min-width: 140px; text-align: center; }
+  .sig-col-label { font-size: 12px; color: var(--c-muted); margin-bottom: 0.4rem; }
+  .sig-img { max-width: 100%; max-height: 120px; border: 1px solid var(--c-border); border-radius: 8px; padding: 4px; }
+  .sig-img-processed { background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 0 0 / 12px 12px; }
+  .sig-meta { font-size: 13px; color: var(--c-muted); margin-bottom: 1rem; }
+  .upload-label { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 0.75rem 1rem; border-radius: var(--radius); border: 1.5px dashed var(--c-border); background: var(--c-bg); font-size: 15px; cursor: pointer; transition: border-color .15s, background .15s; color: var(--c-muted); margin-bottom: 0; }
+  .upload-label:hover { border-color: var(--c-accent); background: var(--c-accent-bg); color: var(--c-accent); }
+  .sig-current-badge { display: flex; align-items: center; gap: 0.5rem; font-size: 12px; color: var(--c-success); margin-bottom: 0.75rem; }
+
+  /* ── hint text ── */
+  .hint { font-size: 12px; color: var(--c-muted); margin-bottom: 0.75rem; line-height: 1.5; }
+
+  /* ── work tab ── */
+  .usage-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 14px; }
+  .usage-bar-bg { height: 6px; background: var(--c-border); border-radius: 3px; overflow: hidden; }
+  .usage-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+  .privacy-note { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 12px; color: var(--c-muted); margin-bottom: 1rem; line-height: 1.5; }
+  .traffic-pill { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 14px; font-weight: 500; padding: 0.35rem 0.75rem; border-radius: 20px; margin-bottom: 0.75rem; }
+  .traffic-pill.green  { background: var(--c-success-bg); color: var(--c-success); }
+  .traffic-pill.yellow { background: #fffbeb; color: #92400e; }
+  .traffic-pill.red    { background: #fef2f2; color: var(--c-danger); }
+  .party-row   { display: flex; align-items: center; gap: 0.5rem; font-size: 13px; padding: 0.3rem 0; }
+  .party-badge { font-size: 11px; background: var(--c-accent-bg); color: var(--c-accent); border-radius: 4px; padding: 0.15rem 0.4rem; }
+
+  /* ── responsive ── */
+  @media (max-width: 600px) {
+    .sidebar { display: none; }
+    .main-content { padding: 1rem; }
+    .mobile-nav { display: flex; }
+  }
+  .mobile-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: var(--c-surface); border-top: 1px solid var(--c-border); z-index: 10; }
+  .mobile-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0.6rem 0.25rem; font-size: 11px; cursor: pointer; color: var(--c-muted); gap: 2px; }
+  .mobile-nav-item.active { color: var(--c-accent); }
+  .mobile-nav-icon { font-size: 20px; }
+  @media (max-width: 600px) { .main-content { padding-bottom: 5rem; } }
+</style>
+</head>
+<body>
+
+<!-- ── Auth screen ── -->
+<div id="screen-auth" class="screen active">
+  <div class="auth-card">
+    <div class="auth-logo">SignFinder</div>
+    <div class="auth-sub">Подпись договоров за минуту</div>
+
+    <div id="auth-msg" class="msg"></div>
+
+    <button class="btn" id="btn-google" onclick="signInGoogle()">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.638-.057-1.252-.164-1.84H9v3.48h4.844a4.14 4.14 0 0 1-1.796 2.717v2.258h2.908C16.657 14.108 17.64 11.863 17.64 9.2z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.185l-2.908-2.258c-.806.54-1.837.859-3.048.859-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.705A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.705V4.963H.957A9 9 0 0 0 0 9c0 1.452.348 2.827.957 4.037l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.963L3.964 7.295C4.672 5.168 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+      Войти через Google
+    </button>
+
+    <div class="divider">или через email</div>
+
+    <div id="form-signin">
+      <input class="input" type="email" id="inp-email" placeholder="email@example.com">
+      <input class="input" type="password" id="inp-pass" placeholder="Пароль">
+      <button class="btn btn-primary" onclick="signInEmail()">Войти</button>
+      <button class="form-link" onclick="showRegister()">Нет аккаунта? Зарегистрироваться</button>
+    </div>
+
+    <div id="form-register" style="display:none">
+      <input class="input" type="email" id="inp-reg-email" placeholder="email@example.com">
+      <input class="input" type="password" id="inp-reg-pass" placeholder="Пароль (минимум 8 символов)">
+      <button class="btn btn-primary" onclick="registerEmail()">Создать аккаунт</button>
+      <button class="form-link" onclick="showSignin()">Уже есть аккаунт? Войти</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Verify email screen ── -->
+<div id="screen-verify" class="screen">
+  <div class="verify-card">
+    <div style="font-size:48px; margin-bottom:1rem">📧</div>
+    <h2>Подтвердите email</h2>
+    <p>Мы отправили письмо на <strong id="verify-email"></strong>.<br>Перейдите по ссылке в письме, затем вернитесь сюда.</p>
+    <button class="btn btn-primary" onclick="checkVerified()" style="margin-bottom:0.75rem">Я подтвердил</button>
+    <button class="btn" onclick="resendVerification()">Отправить письмо повторно</button>
+    <button class="form-link" onclick="signOut()">Выйти</button>
+  </div>
+</div>
+
+<!-- ── Cabinet screen ── -->
+<div id="screen-cabinet" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">SignFinder</div>
+    <div class="topbar-user">
+      <span id="topbar-email"></span>
+      <button class="btn-logout" onclick="signOut()">Выйти</button>
+    </div>
+  </div>
+
+  <div class="cabinet-layout">
+    <nav class="sidebar">
+      <div class="nav-item active" onclick="showTab('profile')" id="nav-profile">
+        <span class="nav-icon">👤</span> Профиль
+      </div>
+      <div class="nav-item" onclick="showTab('signature')" id="nav-signature">
+        <span class="nav-icon">✍️</span> Подпись
+      </div>
+      <div class="nav-item" onclick="showTab('party')" id="nav-party">
+        <span class="nav-icon">🏢</span> Моя сторона
+      </div>
+      <div class="nav-item" onclick="showTab('work')" id="nav-work">
+        <span class="nav-icon">📄</span> Подписать договор
+      </div>
+    </nav>
+
+    <main class="main-content" id="main-content">
+      <!-- injected by showTab() -->
+    </main>
+  </div>
+
+  <!-- Mobile nav -->
+  <div class="mobile-nav">
+    <div class="mobile-nav-item active" onclick="showTab('profile')" id="mnav-profile">
+      <span class="mobile-nav-icon">👤</span>Профиль
+    </div>
+    <div class="mobile-nav-item" onclick="showTab('signature')" id="mnav-signature">
+      <span class="mobile-nav-icon">✍️</span>Подпись
+    </div>
+    <div class="mobile-nav-item" onclick="showTab('party')" id="mnav-party">
+      <span class="mobile-nav-icon">🏢</span>Сторона
+    </div>
+    <div class="mobile-nav-item" onclick="showTab('work')" id="mnav-work">
+      <span class="mobile-nav-icon">📄</span>Договор
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  sendEmailVerification, onAuthStateChanged, signOut as fbSignOut,
+  reload
+} from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+
+const isTest = location.hostname.includes("cab-test") || location.hostname === "localhost" || location.hostname === "127.0.0.1";
+const FIREBASE_CONFIG = isTest ? {
+  apiKey: "AIzaSyBBkhxwQbKwwwq7ald_v7Nv54yTwXLd5c4",
+  authDomain: "signfinder-cab-test.firebaseapp.com",
+  projectId: "signfinder-cab-test",
+  appId: "1:625189729599:web:072b173bdae4b0d0bb0f8a",
+} : {
+  apiKey: "AIzaSyC8ZxhheOJA7E2QHaJC6GPK5LT-5im_iZA",
+  authDomain: "signfinder-c1163.firebaseapp.com",
+  projectId: "signfinder-c1163",
+  appId: "1:550139861345:web:df9cedacbbe270849c4d20",
+};
+
+const app = initializeApp(FIREBASE_CONFIG);
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentUser = null;
+let idToken = null;
+let _processedSigB64 = null;  // holds result from /process until saved
+let _workFile = null;
+let _workAnchors = null;
+let _workPartyTemplate = null;
+
+async function refreshToken() {
+  if (!currentUser) return null;
+  idToken = await currentUser.getIdToken(false);
+  return idToken;
+}
+
+// ── Auth state ─────────────────────────────────────────────────────────────
+onAuthStateChanged(auth, async (user) => {
+  currentUser = user;
+  if (!user) { showScreen("auth"); return; }
+  if (!user.emailVerified) {
+    document.getElementById("verify-email").textContent = user.email;
+    showScreen("verify");
+    return;
+  }
+  idToken = await user.getIdToken();
+  document.getElementById("topbar-email").textContent = user.email;
+  showScreen("cabinet");
+  showTab("profile");
+});
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+window.showScreen = (name) => {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-" + name).classList.add("active");
+};
+
+const TABS = {
+  profile: `
+    <div class="section-title">Профиль</div>
+    <div class="section-sub">Ваши данные, которые подставляются в договоры</div>
+    <div class="card" id="profile-card">
+      <div id="profile-msg" class="msg"></div>
+      <input class="input" id="pf-name" placeholder="ФИО">
+      <input class="input" id="pf-company" placeholder="Компания">
+      <textarea class="input" id="pf-req" rows="3" placeholder="Реквизиты (ИНН, адрес, ...)" style="resize:vertical"></textarea>
+      <button class="btn btn-primary" onclick="saveProfile()">Сохранить</button>
+    </div>`,
+
+  signature: `
+    <div class="section-title">Подпись</div>
+    <div class="section-sub">Будет проставляться на договоры автоматически</div>
+    <div class="card">
+      <div id="sig-msg" class="msg"></div>
+
+      <!-- Current signature (loaded by JS) -->
+      <div id="sig-current"></div>
+
+      <!-- Upload button -->
+      <label class="upload-label">
+        📷 Загрузить или сфотографировать
+        <input type="file" id="sig-file" accept="image/*" capture="environment" style="display:none">
+      </label>
+      <div class="hint" style="margin-top:0.5rem">
+        На телефоне открывает камеру. На десктопе — выбор файла.<br>
+        Подпись на белом листе, хорошее освещение.
+      </div>
+
+      <!-- Processing spinner -->
+      <div id="sig-processing" style="display:none; text-align:center; color:var(--c-muted); font-size:14px; padding:0.5rem 0">
+        ⏳ Обработка...
+      </div>
+
+      <!-- Preview (shown after processing) -->
+      <div id="sig-preview" style="display:none; margin-top:1rem">
+        <div class="sig-grid">
+          <div class="sig-col">
+            <div class="sig-col-label">Оригинал</div>
+            <img id="sig-original" class="sig-img">
+          </div>
+          <div class="sig-col">
+            <div class="sig-col-label">После обработки (прозрачный фон)</div>
+            <img id="sig-processed" class="sig-img sig-img-processed">
+          </div>
+        </div>
+        <div id="sig-meta" class="sig-meta"></div>
+        <button class="btn btn-primary" onclick="saveSignature()" id="btn-save-sig">Сохранить подпись</button>
+      </div>
+    </div>`,
+
+  party: `
+    <div class="section-title">Моя сторона</div>
+    <div class="section-sub">Как ваша компания называется в договорах</div>
+    <div class="card">
+      <div id="party-msg" class="msg"></div>
+      <input class="input" id="pt-name" placeholder="Название компании / ФИО (точно как в договоре)">
+      <input class="input" id="pt-role" placeholder="Роль: ПРОДАВЕЦ, ЗАКАЗЧИК, ИСПОЛНИТЕЛЬ...">
+      <div class="hint">По этим данным система находит место вашей подписи в договоре.</div>
+      <button class="btn btn-primary" onclick="saveParty()">Сохранить</button>
+    </div>`,
+
+  work: `
+    <div class="section-title">Подписать договор</div>
+    <div class="section-sub">Загрузите PDF — найдём место и проставим вашу подпись</div>
+
+    <div class="card" style="padding:1rem 1.5rem">
+      <div class="usage-row">
+        <span>Документы в этом месяце</span>
+        <span id="work-usage-label" style="font-weight:600">—</span>
+      </div>
+      <div class="usage-bar-bg">
+        <div class="usage-bar-fill" id="work-usage-fill" style="width:0%;background:var(--c-success)"></div>
+      </div>
+    </div>
+
+    <div class="privacy-note">
+      <span>🔒</span>
+      <span>Документ не сохраняется. Обрабатывается в памяти Cloud Run и удаляется сразу после возврата подписанного PDF.</span>
+    </div>
+
+    <div class="card" id="work-upload-card">
+      <div id="work-msg" class="msg"></div>
+      <label class="upload-label" id="work-dropzone">
+        📄 Перетащите PDF или нажмите для выбора
+        <input type="file" id="work-file" accept=".pdf" style="display:none">
+      </label>
+      <div class="hint" style="margin-top:0.5rem">PDF · до 5 МБ · до 3 страниц</div>
+    </div>
+
+    <div id="work-spinner" style="display:none" class="card">
+      <div style="text-align:center;color:var(--c-muted);font-size:14px;padding:1rem 0">
+        <span id="work-spinner-text">⏳ Анализируем документ...</span>
+      </div>
+    </div>
+
+    <div id="work-result-card" style="display:none" class="card">
+      <div id="work-traffic-light"></div>
+      <div id="work-parties"></div>
+      <div id="work-anchor-info" style="font-size:14px;color:var(--c-muted);margin-bottom:1rem"></div>
+      <div id="work-sign-area"></div>
+    </div>`,
+};
+
+window.showTab = (tab) => {
+  _processedSigB64 = null;
+  _workFile = null; _workAnchors = null;
+  document.querySelectorAll(".nav-item, .mobile-nav-item").forEach(el => el.classList.remove("active"));
+  const navEl = document.getElementById("nav-" + tab);
+  const mnavEl = document.getElementById("mnav-" + tab);
+  if (navEl) navEl.classList.add("active");
+  if (mnavEl) mnavEl.classList.add("active");
+  document.getElementById("main-content").innerHTML = TABS[tab] || "";
+  if (tab === "profile")   { loadProfile(); }
+  if (tab === "signature") { initSignatureTab(); }
+  if (tab === "party")     { loadParty(); }
+  if (tab === "work")      { initWorkTab(); }
+};
+
+// ── API helper ─────────────────────────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  const token = await refreshToken();
+  const headers = { Authorization: "Bearer " + token };
+  if (!(opts.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+  return fetch("/api" + path, { ...opts, headers: { ...headers, ...opts.headers } });
+}
+
+// ── Profile ────────────────────────────────────────────────────────────────
+async function loadProfile() {
+  const res = await apiFetch("/v1/me/profile");
+  if (!res.ok) return;
+  const data = await res.json();
+  const n = document.getElementById("pf-name");
+  const c = document.getElementById("pf-company");
+  const r = document.getElementById("pf-req");
+  if (n) n.value = data.full_name || "";
+  if (c) c.value = data.company || "";
+  if (r) r.value = data.requisites || "";
+}
+
+window.saveProfile = async () => {
+  const body = {
+    full_name: document.getElementById("pf-name").value.trim(),
+    company:   document.getElementById("pf-company").value.trim(),
+    requisites:document.getElementById("pf-req").value.trim(),
+  };
+  const res = await apiFetch("/v1/me/profile", { method: "PUT", body: JSON.stringify(body) });
+  showTabMsg("profile-msg", res.ok ? "Сохранено" : "Ошибка сохранения", res.ok ? "success" : "error");
+};
+
+// ── Signature ──────────────────────────────────────────────────────────────
+function initSignatureTab() {
+  loadCurrentSignature();
+  const fileInput = document.getElementById("sig-file");
+  if (fileInput) fileInput.addEventListener("change", onSigFileChange);
+}
+
+async function loadCurrentSignature() {
+  const el = document.getElementById("sig-current");
+  if (!el) return;
+  const token = await refreshToken();
+  const res = await fetch("/api/v1/me/signature", { headers: { Authorization: "Bearer " + token } });
+  if (res.ok) {
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    el.innerHTML = `
+      <div style="margin-bottom:1rem">
+        <div class="sig-col-label" style="margin-bottom:0.4rem">Текущая подпись</div>
+        <img src="${url}" class="sig-img sig-img-processed" style="max-height:72px">
+        <div class="sig-current-badge">✓ Подпись загружена</div>
+      </div>`;
+  }
+}
+
+async function onSigFileChange(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // Show original preview immediately
+  document.getElementById("sig-original").src = URL.createObjectURL(file);
+  document.getElementById("sig-preview").style.display = "none";
+  document.getElementById("sig-processing").style.display = "block";
+  document.getElementById("sig-msg").className = "msg";
+  _processedSigB64 = null;
+
+  // Process on server (OpenCV: crop, HSV+adaptive, RGBA transparent bg)
+  const fd = new FormData();
+  fd.append("file", file);
+  let res;
+  try {
+    res = await apiFetch("/v1/me/signature/process", { method: "POST", body: fd });
+  } catch {
+    document.getElementById("sig-processing").style.display = "none";
+    showTabMsg("sig-msg", "Ошибка соединения", "error");
+    return;
+  }
+
+  document.getElementById("sig-processing").style.display = "none";
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    showTabMsg("sig-msg", err.detail || "Ошибка обработки", "error");
+    return;
+  }
+
+  const data = await res.json();
+  _processedSigB64 = data.processed_png_b64;
+
+  // Show processed preview
+  document.getElementById("sig-processed").src = "data:image/png;base64," + data.processed_png_b64;
+  document.getElementById("sig-preview").style.display = "block";
+
+  // Confidence / warnings
+  const pct = Math.round((data.confidence || 0) * 100);
+  const warns = (data.warnings || []).length
+    ? "⚠️ " + data.warnings.join("; ")
+    : "✓ Обработка успешна";
+  document.getElementById("sig-meta").textContent = `Качество: ${pct}%  •  ${warns}`;
+}
+
+window.saveSignature = async () => {
+  if (!_processedSigB64) return;
+  const btn = document.getElementById("btn-save-sig");
+  if (btn) { btn.disabled = true; btn.textContent = "Сохранение..."; }
+
+  const res = await apiFetch("/v1/me/signature", {
+    method: "PUT",
+    body: JSON.stringify({ png_b64: _processedSigB64 }),
+  });
+
+  if (btn) { btn.disabled = false; btn.textContent = "Сохранить подпись"; }
+
+  if (res.ok) {
+    showTabMsg("sig-msg", "Подпись сохранена", "success");
+    _processedSigB64 = null;
+    loadCurrentSignature();  // refresh current badge
+  } else {
+    showTabMsg("sig-msg", "Ошибка сохранения", "error");
+  }
+};
+
+// ── Party ──────────────────────────────────────────────────────────────────
+async function loadParty() {
+  const res = await apiFetch("/v1/me/party");
+  if (!res.ok) return;
+  const data = await res.json();
+  const n = document.getElementById("pt-name");
+  const r = document.getElementById("pt-role");
+  if (n) n.value = data.name || "";
+  if (r) r.value = data.role || "";
+}
+
+window.saveParty = async () => {
+  const body = {
+    name: document.getElementById("pt-name").value.trim(),
+    role: document.getElementById("pt-role").value.trim(),
+  };
+  const res = await apiFetch("/v1/me/party", { method: "PUT", body: JSON.stringify(body) });
+  showTabMsg("party-msg", res.ok ? "Сохранено" : "Ошибка сохранения", res.ok ? "success" : "error");
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function showTabMsg(id, text, type) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = "msg " + type;
+  el.textContent = text;
+  if (type === "success" || type === "info") {
+    setTimeout(() => { el.className = "msg"; }, 3000);
+  }
+}
+
+// ── Auth actions ───────────────────────────────────────────────────────────
+window.signInGoogle = async () => {
+  clearMsg();
+  try { await signInWithPopup(auth, googleProvider); }
+  catch (e) { showMsg(e.message, "error"); }
+};
+
+window.signInEmail = async () => {
+  clearMsg();
+  const email = document.getElementById("inp-email").value.trim();
+  const pass = document.getElementById("inp-pass").value;
+  try { await signInWithEmailAndPassword(auth, email, pass); }
+  catch (e) { showMsg(friendlyError(e.code), "error"); }
+};
+
+window.registerEmail = async () => {
+  clearMsg();
+  const email = document.getElementById("inp-reg-email").value.trim();
+  const pass = document.getElementById("inp-reg-pass").value;
+  if (pass.length < 8) { showMsg("Пароль минимум 8 символов", "error"); return; }
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await sendEmailVerification(cred.user);
+    showMsg("Письмо отправлено — проверьте почту", "info");
+  } catch (e) { showMsg(friendlyError(e.code), "error"); }
+};
+
+window.resendVerification = async () => {
+  if (currentUser) await sendEmailVerification(currentUser);
+  alert("Письмо отправлено повторно");
+};
+
+window.checkVerified = async () => {
+  if (!currentUser) return;
+  await reload(currentUser);
+  if (currentUser.emailVerified) {
+    idToken = await currentUser.getIdToken(true);
+    document.getElementById("topbar-email").textContent = currentUser.email;
+    showScreen("cabinet");
+    showTab("profile");
+  } else {
+    alert("Email ещё не подтверждён. Проверьте письмо.");
+  }
+};
+
+// ── Work tab ───────────────────────────────────────────────────────────────
+async function initWorkTab() {
+  loadWorkUsage();
+  // Pre-load party template for "our side" hint
+  const res = await apiFetch("/v1/me/party");
+  if (res.ok) _workPartyTemplate = await res.json();
+
+  const fileInput = document.getElementById("work-file");
+  if (fileInput) fileInput.addEventListener("change", e => {
+    const f = e.target.files[0]; if (f) handleWorkFile(f);
+  });
+
+  // Drag & drop on the drop zone label
+  const dz = document.getElementById("work-dropzone");
+  if (dz) {
+    dz.addEventListener("dragover", e => { e.preventDefault(); dz.style.borderColor = "var(--c-accent)"; dz.style.background = "var(--c-accent-bg)"; });
+    dz.addEventListener("dragleave", () => { dz.style.borderColor = ""; dz.style.background = ""; });
+    dz.addEventListener("drop", e => {
+      e.preventDefault(); dz.style.borderColor = ""; dz.style.background = "";
+      const f = e.dataTransfer.files[0]; if (f) handleWorkFile(f);
+    });
+  }
+}
+
+async function loadWorkUsage() {
+  const res = await apiFetch("/v1/me/usage");
+  if (!res.ok) return;
+  const { doc_count, limit } = await res.json();
+  const label = document.getElementById("work-usage-label");
+  const fill  = document.getElementById("work-usage-fill");
+  if (!label || !fill) return;
+  const pct = Math.min(100, Math.round(doc_count / limit * 100));
+  const color = doc_count >= limit ? "var(--c-danger)" : doc_count >= limit * 0.8 ? "#d97706" : "var(--c-success)";
+  label.textContent = `${doc_count} / ${limit}`;
+  label.style.color = color;
+  fill.style.width = pct + "%";
+  fill.style.background = color;
+  if (doc_count >= limit) {
+    const uc = document.getElementById("work-upload-card");
+    if (uc) uc.innerHTML = '<div class="stub">Лимит исчерпан (10 документов в месяц).<br>Свяжитесь с нами для увеличения лимита.</div>';
+  }
+}
+
+async function handleWorkFile(file) {
+  if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
+    return showWorkMsg("Только PDF файлы", "error");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    return showWorkMsg("Файл слишком большой (макс 5 МБ)", "error");
+  }
+  _workFile = file; _workAnchors = null;
+  document.getElementById("work-result-card").style.display = "none";
+  showWorkMsg("", "");
+  showWorkSpinner("Анализируем документ...");
+
+  const fd = new FormData();
+  fd.append("file", file);
+  let res;
+  try { res = await apiFetch("/v1/me/analyze", { method: "POST", body: fd }); }
+  catch { hideWorkSpinner(); return showWorkMsg("Ошибка соединения", "error"); }
+
+  hideWorkSpinner();
+
+  if (res.status === 429) {
+    showWorkMsg("Лимит документов исчерпан на этот месяц", "error");
+    return loadWorkUsage();
+  }
+  if (res.status === 413) {
+    const e = await res.json().catch(() => ({}));
+    return showWorkMsg(e.detail || "Файл слишком большой", "error");
+  }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    return showWorkMsg(e.detail || "Ошибка анализа", "error");
+  }
+
+  const result = await res.json();
+  _workAnchors = result.anchors || [];
+  renderAnalysisResult(result);
+}
+
+function renderAnalysisResult(result) {
+  const card = document.getElementById("work-result-card");
+  if (!card) return;
+  card.style.display = "block";
+
+  // Traffic light
+  const tlEl = document.getElementById("work-traffic-light");
+  const tl = result.traffic_light;
+  const tlMap = {
+    green:    ["green",  "✅ Места подписи найдены"],
+    yellow:   ["yellow", "⚠️ Найдено с низкой уверенностью"],
+    no_match: ["red",    "❌ Места подписи не найдены"],
+  };
+  const [cls, label] = tlMap[tl] || tlMap.no_match;
+  tlEl.innerHTML = `<div class="traffic-pill ${cls}">${label}</div>`;
+
+  // Parties found
+  const partiesEl = document.getElementById("work-parties");
+  const matches = result.matches || [];
+  const parties = [...new Set(matches.map(m => m.party).filter(Boolean))];
+  const ourSideName = result.our_side
+    ? (result.our_side.party || result.our_side.name || result.our_side.alias || "")
+    : "";
+  const templateName = (_workPartyTemplate && _workPartyTemplate.name) || "";
+  if (parties.length) {
+    const rows = parties.map(p => {
+      const cnt = matches.filter(m => m.party === p).length;
+      const isOurs = ourSideName
+        ? p === ourSideName
+        : templateName && p.toLowerCase().includes(templateName.toLowerCase().slice(0, 6));
+      return `<div class="party-row">
+        <span style="color:${isOurs ? "var(--c-accent)" : "var(--c-muted)"}">
+          ${isOurs ? "▶" : "·"}
+        </span>
+        <span>${p}</span>
+        <span style="font-size:12px;color:var(--c-muted)">${cnt} ${cnt === 1 ? "место" : "места/мест"}</span>
+        ${isOurs ? '<span class="party-badge">наша сторона</span>' : ""}
+      </div>`;
+    }).join("");
+    partiesEl.innerHTML = `
+      <div style="font-size:12px;color:var(--c-muted);margin-bottom:0.4rem">Стороны в документе:</div>
+      ${rows}
+      <div style="height:1px;background:var(--c-border);margin:0.75rem 0"></div>`;
+  } else {
+    partiesEl.innerHTML = "";
+  }
+
+  // Anchor count + sign button
+  const n = _workAnchors.length;
+  document.getElementById("work-anchor-info").textContent =
+    n > 0 ? `Мест для подписи: ${n}` : "Мест для подписи не найдено.";
+
+  const signArea = document.getElementById("work-sign-area");
+  if (n > 0) {
+    signArea.innerHTML = `<button class="btn btn-primary" id="btn-work-sign" onclick="workSign()">Подписать и скачать</button>`;
+  } else {
+    signArea.innerHTML = `<p style="font-size:13px;color:var(--c-muted)">Попробуйте другой документ или шаблон подписи.</p>`;
+  }
+
+  if (result.error) showWorkMsg(result.error, "info");
+}
+
+window.workSign = async () => {
+  if (!_workFile || !_workAnchors || !_workAnchors.length) return;
+  const btn = document.getElementById("btn-work-sign");
+  if (btn) { btn.disabled = true; btn.textContent = "Подписываем..."; }
+  showWorkMsg("", "");
+
+  const fd = new FormData();
+  fd.append("file", _workFile);
+  fd.append("anchors_json", JSON.stringify(_workAnchors));
+
+  let res;
+  try { res = await apiFetch("/v1/me/sign", { method: "POST", body: fd }); }
+  catch {
+    if (btn) { btn.disabled = false; btn.textContent = "Подписать и скачать"; }
+    return showWorkMsg("Ошибка соединения", "error");
+  }
+
+  if (res.status === 429) {
+    if (btn) { btn.disabled = false; btn.textContent = "Подписать и скачать"; }
+    showWorkMsg("Лимит документов исчерпан на этот месяц", "error");
+    return loadWorkUsage();
+  }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    if (btn) { btn.disabled = false; btn.textContent = "Подписать и скачать"; }
+    return showWorkMsg(e.detail || "Ошибка подписания", "error");
+  }
+
+  // Trigger download
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "signed_" + _workFile.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+  // Reset button for re-use
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = "✅ Готово — загрузить другой?";
+    btn.onclick = () => {
+      _workFile = null; _workAnchors = null;
+      document.getElementById("work-result-card").style.display = "none";
+      showWorkMsg("", "");
+      // Reset file input
+      const fi = document.getElementById("work-file");
+      if (fi) fi.value = "";
+    };
+  }
+  loadWorkUsage();
+};
+
+function showWorkMsg(text, type) {
+  const el = document.getElementById("work-msg");
+  if (!el) return;
+  el.className = "msg" + (type ? " " + type : "");
+  el.textContent = text;
+}
+function showWorkSpinner(text) {
+  const sp = document.getElementById("work-spinner");
+  const t  = document.getElementById("work-spinner-text");
+  if (sp) sp.style.display = "block";
+  if (t)  t.textContent = "⏳ " + text;
+}
+function hideWorkSpinner() {
+  const sp = document.getElementById("work-spinner");
+  if (sp) sp.style.display = "none";
+}
+
+window.signOut = async () => { await fbSignOut(auth); };
+window.showRegister = () => {
+  document.getElementById("form-signin").style.display = "none";
+  document.getElementById("form-register").style.display = "block";
+};
+window.showSignin = () => {
+  document.getElementById("form-register").style.display = "none";
+  document.getElementById("form-signin").style.display = "block";
+};
+
+function showMsg(text, type) {
+  const el = document.getElementById("auth-msg");
+  el.className = "msg " + type; el.textContent = text;
+}
+function clearMsg() {
+  document.getElementById("auth-msg").className = "msg";
+}
+function friendlyError(code) {
+  return ({
+    "auth/wrong-password": "Неверный пароль",
+    "auth/user-not-found": "Пользователь не найден",
+    "auth/email-already-in-use": "Email уже зарегистрирован",
+    "auth/weak-password": "Пароль слишком слабый",
+    "auth/invalid-email": "Некорректный email",
+    "auth/too-many-requests": "Слишком много попыток — попробуйте позже",
+    "auth/invalid-credential": "Неверный email или пароль",
+  })[code] || "Ошибка входа";
+}
+</script>
+</body>
+</html>
