@@ -4,12 +4,33 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deploy target"
+        required: false
+        type: choice
+        options: ["test", "prod"]
+        default: "test"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set environment
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ inputs.environment }}"
+          else
+            ENV="test"
+          fi
+          echo "DEPLOY_ENV=$ENV" >> $GITHUB_ENV
+          if [ "$ENV" = "prod" ]; then
+            echo "FB_PROJECT=signfinder-prod" >> $GITHUB_ENV
+          else
+            echo "FB_PROJECT=signfinder-cab-test" >> $GITHUB_ENV
+          fi
 
       - name: Read web version
         run: |
@@ -19,27 +40,26 @@ jobs:
       - name: Inject version into cabinet HTML
         run: |
           VERSION_TAG="${{ env.WEB_VERSION }}"
-          # inject or replace window.__SF_VERSION__
           if grep -q '__SF_VERSION__' app/index.html; then
             sed -i "s|window\.__SF_VERSION__\s*=\s*['\"][^'\"]*['\"]|window.__SF_VERSION__ = '${VERSION_TAG}'|g" app/index.html
           else
             sed -i "s|</head>|<script>window.__SF_VERSION__ = '${VERSION_TAG}';</script></head>|" app/index.html
           fi
-          echo "Injected version: $VERSION_TAG"
+          echo "Injected version: $VERSION_TAG into ${{ env.FB_PROJECT }}"
 
       - uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GOOGLE_CREDENTIALS_PROD }}
+          credentials_json: ${{ env.DEPLOY_ENV == 'prod' && secrets.GOOGLE_CREDENTIALS_PROD || secrets.GOOGLE_CREDENTIALS_TEST }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Deploy Firebase Hosting (prod)
+      - name: Deploy Firebase Hosting
         run: |
           npm install -g firebase-tools --silent
-          firebase deploy --only hosting --project=signfinder-prod
+          firebase deploy --only hosting --project=${{ env.FB_PROJECT }}
 
-      - name: Notify Telegram — web deployed
-        if: always()
+      - name: Notify Telegram (prod only)
+        if: always() && env.DEPLOY_ENV == 'prod'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -54,23 +74,18 @@ jobs:
           bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
           chat_id   = os.environ.get("TELEGRAM_CHAT_ID", "")
           if not bot_token or not chat_id:
-              print("Telegram secrets not set — skipping")
               exit(0)
-          status  = os.environ.get("JOB_STATUS", "unknown")
-          web_v   = os.environ.get("WEB_VERSION", "?")
-          run_n   = os.environ.get("GH_RUN", "?")
-          actor   = os.environ.get("GH_ACTOR", "?")
+          status = os.environ.get("JOB_STATUS", "unknown")
           icon = "\u2705" if status == "success" else "\U0001f6a8"
           text = (
-              f"{icon} SignFinder PROD — Web deployed\n"
-              f"Web:  v{web_v}\n"
+              f"{icon} SignFinder PROD \u2014 Web deployed\n"
+              f"Web:  v{os.environ.get('WEB_VERSION','?')}\n"
               f"URL:  https://signfinder.app\n"
-              f"Status: {status} | run #{run_n} by {actor}"
+              f"Status: {status} | run #{os.environ.get('GH_RUN','?')} by {os.environ.get('GH_ACTOR','?')}"
           )
           resp = requests.post(
               f"https://api.telegram.org/bot{bot_token}/sendMessage",
-              json={"chat_id": chat_id, "text": text},
-              timeout=10,
+              json={"chat_id": chat_id, "text": text}, timeout=10,
           )
           print(f"Telegram: {resp.status_code}")
           PYEOF
