@@ -182,9 +182,6 @@
       <div class="nav-item" onclick="showTab('signature')" id="nav-signature">
         <span class="nav-icon">✍️</span> Подпись
       </div>
-      <div class="nav-item" onclick="showTab('party')" id="nav-party">
-        <span class="nav-icon">🏢</span> Моя сторона
-      </div>
       <div class="nav-item" onclick="showTab('work')" id="nav-work">
         <span class="nav-icon">📄</span> Подписать договор
       </div>
@@ -202,9 +199,6 @@
     </div>
     <div class="mobile-nav-item" onclick="showTab('signature')" id="mnav-signature">
       <span class="mobile-nav-icon">✍️</span>Подпись
-    </div>
-    <div class="mobile-nav-item" onclick="showTab('party')" id="mnav-party">
-      <span class="mobile-nav-icon">🏢</span>Сторона
     </div>
     <div class="mobile-nav-item" onclick="showTab('work')" id="mnav-work">
       <span class="mobile-nav-icon">📄</span>Договор
@@ -293,6 +287,9 @@ const TABS = {
       <input class="input" id="pf-name" placeholder="ФИО">
       <input class="input" id="pf-company" placeholder="Компания">
       <textarea class="input" id="pf-req" rows="3" placeholder="Реквизиты (ИНН, адрес, ...)" style="resize:vertical"></textarea>
+      <div style="font-size:12px;color:var(--c-muted);margin-bottom:0.75rem;margin-top:0.25rem">Название и роль в договоре — по ним система находит место подписи</div>
+      <input class="input" id="pt-name" placeholder="Название в договоре (точно как написано)">
+      <input class="input" id="pt-role" placeholder="Роль: ПРОДАВЕЦ, ЗАКАЗЧИК, ИСПОЛНИТЕЛЬ...">
       <button class="btn btn-primary" onclick="saveProfile()">Сохранить</button>
     </div>
     <div id="profile-version-footer" style="margin-top:2rem;text-align:center;font-size:11px;color:var(--c-muted)"></div>`,
@@ -440,6 +437,15 @@ async function loadProfile() {
   if (n) n.value = data.full_name || "";
   if (c) c.value = data.company || "";
   if (r) r.value = data.requisites || "";
+  // also load party
+  const rp = await apiFetch("/v1/me/party");
+  if (rp.ok) {
+    const pd = await rp.json();
+    const pn = document.getElementById("pt-name");
+    const pr = document.getElementById("pt-role");
+    if (pn) pn.value = pd.name || "";
+    if (pr) pr.value = pd.role || "";
+  }
 }
 
 window.saveProfile = async () => {
@@ -448,9 +454,17 @@ window.saveProfile = async () => {
     company:   document.getElementById("pf-company").value.trim(),
     requisites:document.getElementById("pf-req").value.trim(),
   };
-  const res = await apiFetch("/v1/me/profile", { method: "PUT", body: JSON.stringify(body) });
-  showTabMsg("profile-msg", res.ok ? "Сохранено" : "Ошибка сохранения", res.ok ? "success" : "error");
-  if (res.ok && window.posthog) posthog.capture("profile_filled");
+  const partyBody = {
+    name: (document.getElementById("pt-name") || {}).value?.trim() || "",
+    role: (document.getElementById("pt-role") || {}).value?.trim() || "",
+  };
+  const [res, rp] = await Promise.all([
+    apiFetch("/v1/me/profile", { method: "PUT", body: JSON.stringify(body) }),
+    apiFetch("/v1/me/party",   { method: "PUT", body: JSON.stringify(partyBody) }),
+  ]);
+  const ok = res.ok && rp.ok;
+  showTabMsg("profile-msg", ok ? "Сохранено" : "Ошибка сохранения", ok ? "success" : "error");
+  if (ok && window.posthog) posthog.capture("profile_filled");
 };
 
 // ── Signature ──────────────────────────────────────────────────────────────
