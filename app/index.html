@@ -420,8 +420,14 @@ async function apiFetch(path, opts = {}) {
 async function loadProfile() {
   const footer = document.getElementById("profile-version-footer");
   if (footer) {
-    const v = (typeof window.__SF_VERSION__ !== 'undefined') ? window.__SF_VERSION__ : 'dev';
-    footer.textContent = `SignFinder v${v}`;
+    const webV = (typeof window.__SF_VERSION__ !== 'undefined') ? window.__SF_VERSION__ : 'dev';
+    footer.textContent = `Web v${webV}`;
+    // fetch API version async, update when ready
+    apiFetch("/version").then(r => r.ok ? r.json() : null).then(d => {
+      if (d && footer) {
+        footer.textContent = `Web v${webV} \u00b7 API v${d.api_version || '?'} \u00b7 Core v${d.signfinder_core_version || '?'}`;
+      }
+    }).catch(() => {});
   }
   const res = await apiFetch("/v1/me/profile");
   if (!res.ok) return;

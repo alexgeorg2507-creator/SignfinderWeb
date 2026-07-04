@@ -16,11 +16,8 @@ jobs:
 
       - name: Inject version into cabinet HTML
         run: |
-          if grep -q '__SF_VERSION__' app/index.html; then
-            sed -i "s|window\.__SF_VERSION__\s*=\s*['\"][^'\"]*['\"]|window.__SF_VERSION__ = '${{ env.WEB_VERSION }}';</script></head>|g" app/index.html
-          else
-            sed -i "s|</head>|<script>window.__SF_VERSION__ = '${{ env.WEB_VERSION }}';</script></head>|" app/index.html
-          fi
+          sed -i 's|<script>window\.__SF_VERSION__[^<]*</script>||g' app/index.html
+          sed -i "s|</head>|<script>window.__SF_VERSION__ = '${{ env.WEB_VERSION }}';</script></head>|" app/index.html
 
       - uses: google-github-actions/auth@v2
         with:
