@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SignFinder — Кабинет</title>
+<script>
+  !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.uid.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSurveysCache".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+  posthog.init('phc_sfzS6t6xSSifT8ibLFjNpwxg6gjY8yAd6HK9DfPoYHJD', {api_host: 'https://eu.i.posthog.com', capture_pageview: true});
+</script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -160,7 +164,10 @@
 <!-- ── Cabinet screen ── -->
 <div id="screen-cabinet" class="screen">
   <div class="topbar">
-    <div class="topbar-logo">SignFinder</div>
+    <div class="topbar-logo">
+      SignFinder
+      <span id="app-version-badge" style="font-size:11px;font-weight:400;color:var(--c-muted);margin-left:6px"></span>
+    </div>
     <div class="topbar-user">
       <span id="topbar-email"></span>
       <button class="btn-logout" onclick="signOut()">Выйти</button>
@@ -222,15 +229,20 @@ const FIREBASE_CONFIG = isTest ? {
   projectId: "signfinder-cab-test",
   appId: "1:625189729599:web:072b173bdae4b0d0bb0f8a",
 } : {
-  apiKey: "AIzaSyC8ZxhheOJA7E2QHaJC6GPK5LT-5im_iZA",
-  authDomain: "signfinder-c1163.firebaseapp.com",
-  projectId: "signfinder-c1163",
-  appId: "1:550139861345:web:df9cedacbbe270849c4d20",
+  apiKey: "AIzaSyAv9NLFuBj1uQbdmxZxVU7YC5bLfdNufuM",
+  authDomain: "signfinder-prod.firebaseapp.com",
+  projectId: "signfinder-prod",
+  appId: "1:449403012307:web:218031f974d1d36f0cc026",
 };
 
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
+
+// Version badge — injected by CI, fallback to 'dev'
+const _sfVersion = (typeof window.__SF_VERSION__ !== 'undefined') ? window.__SF_VERSION__ : 'dev';
+const _vBadge = document.getElementById('app-version-badge');
+if (_vBadge) _vBadge.textContent = 'v' + _sfVersion;
 
 // ── State ──────────────────────────────────────────────────────────────────
 let currentUser = null;
@@ -239,6 +251,7 @@ let _processedSigB64 = null;  // holds result from /process until saved
 let _workFile = null;
 let _workAnchors = null;
 let _workPartyTemplate = null;
+let _signupCompletedFired = false;
 
 async function refreshToken() {
   if (!currentUser) return null;
@@ -259,6 +272,10 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById("topbar-email").textContent = user.email;
   showScreen("cabinet");
   showTab("profile");
+  if (!_signupCompletedFired) {
+    _signupCompletedFired = true;
+    if (window.posthog) posthog.capture("signup_completed");
+  }
 });
 
 // ── Navigation ─────────────────────────────────────────────────────────────
@@ -419,6 +436,7 @@ window.saveProfile = async () => {
   };
   const res = await apiFetch("/v1/me/profile", { method: "PUT", body: JSON.stringify(body) });
   showTabMsg("profile-msg", res.ok ? "Сохранено" : "Ошибка сохранения", res.ok ? "success" : "error");
+  if (res.ok && window.posthog) posthog.capture("profile_filled");
 };
 
 // ── Signature ──────────────────────────────────────────────────────────────
@@ -431,8 +449,15 @@ function initSignatureTab() {
 async function loadCurrentSignature() {
   const el = document.getElementById("sig-current");
   if (!el) return;
+  el.innerHTML = '<div style="font-size:13px;color:var(--c-muted);padding:0.5rem 0">⏳ Загружаем подпись...</div>';
   const token = await refreshToken();
-  const res = await fetch("/api/v1/me/signature", { headers: { Authorization: "Bearer " + token } });
+  let res;
+  try {
+    res = await fetch("/api/v1/me/signature", { headers: { Authorization: "Bearer " + token } });
+  } catch {
+    el.innerHTML = '<div style="font-size:13px;color:var(--c-danger);margin-bottom:0.75rem">⚠️ Нет связи с сервером</div>';
+    return;
+  }
   if (res.ok) {
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -442,6 +467,10 @@ async function loadCurrentSignature() {
         <img src="${url}" class="sig-img sig-img-processed" style="max-height:72px">
         <div class="sig-current-badge">✓ Подпись загружена</div>
       </div>`;
+  } else if (res.status === 404) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--c-muted);margin-bottom:0.75rem">Подпись ещё не загружена</div>';
+  } else {
+    el.innerHTML = '<div style="font-size:13px;color:var(--c-danger);margin-bottom:0.75rem">⚠️ Не удалось загрузить текущую подпись</div>';
   }
 }
 
@@ -506,7 +535,9 @@ window.saveSignature = async () => {
   if (res.ok) {
     showTabMsg("sig-msg", "Подпись сохранена", "success");
     _processedSigB64 = null;
+    document.getElementById("sig-preview").style.display = "none";
     loadCurrentSignature();  // refresh current badge
+    if (window.posthog) posthog.capture("signature_uploaded");
   } else {
     showTabMsg("sig-msg", "Ошибка сохранения", "error");
   }
@@ -546,6 +577,7 @@ function showTabMsg(id, text, type) {
 // ── Auth actions ───────────────────────────────────────────────────────────
 window.signInGoogle = async () => {
   clearMsg();
+  if (window.posthog) posthog.capture("signup_started", {method: "google"});
   try { await signInWithPopup(auth, googleProvider); }
   catch (e) { showMsg(e.message, "error"); }
 };
@@ -563,6 +595,7 @@ window.registerEmail = async () => {
   const email = document.getElementById("inp-reg-email").value.trim();
   const pass = document.getElementById("inp-reg-pass").value;
   if (pass.length < 8) { showMsg("Пароль минимум 8 символов", "error"); return; }
+  if (window.posthog) posthog.capture("signup_started", {method: "email"});
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     await sendEmailVerification(cred.user);
@@ -653,6 +686,7 @@ async function handleWorkFile(file) {
 
   if (res.status === 429) {
     showWorkMsg("Лимит документов исчерпан на этот месяц", "error");
+    if (window.posthog) posthog.capture("limit_reached", {step: "analyze"});
     return loadWorkUsage();
   }
   if (res.status === 413) {
@@ -751,6 +785,7 @@ window.workSign = async () => {
   if (res.status === 429) {
     if (btn) { btn.disabled = false; btn.textContent = "Подписать и скачать"; }
     showWorkMsg("Лимит документов исчерпан на этот месяц", "error");
+    if (window.posthog) posthog.capture("limit_reached", {step: "sign"});
     return loadWorkUsage();
   }
   if (!res.ok) {
@@ -766,6 +801,7 @@ window.workSign = async () => {
   a.href = url; a.download = "signed_" + _workFile.name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+  if (window.posthog) posthog.capture("document_signed");
 
   // Reset button for re-use
   if (btn) {
