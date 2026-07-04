@@ -294,7 +294,8 @@ const TABS = {
       <input class="input" id="pf-company" placeholder="Компания">
       <textarea class="input" id="pf-req" rows="3" placeholder="Реквизиты (ИНН, адрес, ...)" style="resize:vertical"></textarea>
       <button class="btn btn-primary" onclick="saveProfile()">Сохранить</button>
-    </div>`,
+    </div>
+    <div id="profile-version-footer" style="margin-top:2rem;text-align:center;font-size:11px;color:var(--c-muted)"></div>`,
 
   signature: `
     <div class="section-title">Подпись</div>
@@ -417,6 +418,11 @@ async function apiFetch(path, opts = {}) {
 
 // ── Profile ────────────────────────────────────────────────────────────────
 async function loadProfile() {
+  const footer = document.getElementById("profile-version-footer");
+  if (footer) {
+    const v = (typeof window.__SF_VERSION__ !== 'undefined') ? window.__SF_VERSION__ : 'dev';
+    footer.textContent = `SignFinder v${v}`;
+  }
   const res = await apiFetch("/v1/me/profile");
   if (!res.ok) return;
   const data = await res.json();
