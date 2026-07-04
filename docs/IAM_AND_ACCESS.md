@@ -13,7 +13,7 @@
 |----|-------|------|------------|
 | Cloud Run runtime | `signfinder-api@signfinder-cab-test.iam.gserviceaccount.com` | `cloudsql.client`, `secretmanager.secretAccessor`, `storage.objectAdmin` | Рантайм API на test |
 | Cloud Build default | `625189729599@cloudbuild.gserviceaccount.com` | `cloudbuild.builds.builder`, `run.admin`, `editor` | Сборка и деплой |
-| GitHub Actions | `github-actions@signfinder-cab-test.iam.gserviceaccount.com` | `cloudbuild.builds.editor`, `secretmanager.secretAccessor`, `cloudsql.client`, `serviceusage.serviceUsageConsumer`, `storage.admin` (project-level), `iam.serviceAccountUser` on compute SA | CI/CD из GitHub Actions |
+| GitHub Actions | `github-actions@signfinder-cab-test.iam.gserviceaccount.com` | `cloudbuild.builds.editor`, `secretmanager.secretAccessor`, `cloudsql.client`, `serviceusage.serviceUsageConsumer`, `storage.admin` (project-level), `iam.serviceAccountUser` on compute SA, `firebasehosting.admin` | CI/CD из GitHub Actions |
 | Firebase Admin SDK | `firebase-adminsdk-fbsvc@signfinder-cab-test.iam.gserviceaccount.com` | `firebase.sdkAdminServiceAgent`, `firebaseauth.admin`, `iam.serviceAccountTokenCreator` | Firebase — не используется рантаймом API, только Firebase-консолью |
 
 **Примечание по `signfinder-api-sa`:** В IAM `signfinder-cab-test` есть и `signfinder-api-sa@`, и `signfinder-api@` — оба имеют `cloudsql.client` + `secretmanager.secretAccessor`. Первый, судя по всему, легаси SA от ранней настройки. Актуальный — `signfinder-api@signfinder-cab-test.iam.gserviceaccount.com` (прописан в `cloudbuild-test.yaml`).
@@ -48,9 +48,10 @@
 
 | Secret | Что содержит | Когда нужен |
 |--------|--------------|-------------|
-| `GOOGLE_CREDENTIALS_PROD` | SA JSON для `github-actions@signfinder-prod` (ключ #2, отдельный) | `deploy.yml` |
-| `TELEGRAM_BOT_TOKEN` | то же | `deploy.yml` |
-| `TELEGRAM_CHAT_ID` | то же | `deploy.yml` |
+| `GOOGLE_CREDENTIALS_TEST` | SA JSON для `github-actions@signfinder-cab-test` (отдельный ключ) | `deploy.yml` push → test |
+| `GOOGLE_CREDENTIALS_PROD` | SA JSON для `github-actions@signfinder-prod` (ключ #2) | `deploy.yml` workflow_dispatch → prod |
+| `TELEGRAM_BOT_TOKEN` | то же | `deploy.yml` (prod only) |
+| `TELEGRAM_CHAT_ID` | то же | `deploy.yml` (prod only) |
 
 SA JSON созданы и удалены с диска сразу после добавления в Secrets.
 
