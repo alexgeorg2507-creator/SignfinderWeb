@@ -423,9 +423,11 @@ async function loadProfile() {
     const webV = (typeof window.__SF_VERSION__ !== 'undefined') ? window.__SF_VERSION__ : 'dev';
     footer.textContent = `Web v${webV}`;
     // fetch API version async, update when ready
-    apiFetch("/version").then(r => r.ok ? r.json() : null).then(d => {
+    apiFetch("/v1/version").then(r => r.ok ? r.json() : null).then(d => {
       if (d && footer) {
-        footer.textContent = `Web v${webV} \u00b7 API v${d.api_version || '?'} \u00b7 Core v${d.signfinder_core_version || '?'}`;
+        const apiVer = d.api_build ? `${d.api_version}.${d.api_build}` : (d.api_version || '?');
+        const coreVer = d.signfinder_core_version || '?';
+        footer.textContent = `Web v${webV} \u00b7 API v${apiVer} \u00b7 Core v${coreVer}`;
       }
     }).catch(() => {});
   }
