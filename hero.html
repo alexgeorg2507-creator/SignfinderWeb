@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignFinder — Hero</title>
+<style>
+  :root{
+    --bg:#0d1117;--panel:#ffffff;--ink:#1a1a2e;--accent:#4f7cff;
+    --green:#2ea043;--green-soft:rgba(46,160,67,0.15);--yellow:#d4a017;
+    --yellow-soft:rgba(212,160,23,0.15);--line:#c9c9d4;--card-bg:#f6f8fa;--muted:#8b949e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;background:var(--bg);overflow:hidden;
+    font-family:-apple-system,"Segoe UI",Roboto,sans-serif;}
+  #stage{position:absolute;top:50%;left:50%;width:1280px;height:560px;
+    transform-origin:top left;
+    background:radial-gradient(ellipse at 50% 20%,#161b27 0%,#0d1117 70%);
+    overflow:hidden;border-radius:10px;}
+  .brand{position:absolute;top:22px;left:28px;color:#fff;font-size:20px;
+    font-weight:700;opacity:0;z-index:50;letter-spacing:-0.5px;}
+  .brand .dot{color:var(--accent);}
+  .caption{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);
+    color:#fff;font-size:24px;font-weight:600;text-align:center;
+    width:90%;opacity:0;text-shadow:0 2px 16px rgba(0,0,0,0.6);letter-spacing:-0.3px;}
+
+  /* СТОПКА */
+  #stack{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);}
+  .doc-card{position:absolute;width:160px;height:210px;background:#fff;
+    border-radius:7px;box-shadow:0 8px 24px rgba(0,0,0,0.35);left:-80px;top:-105px;}
+  .doc-card::before{content:"";position:absolute;left:16px;right:16px;top:20px;
+    height:5px;background:#e0e0e8;border-radius:3px;
+    box-shadow:0 14px 0 #e0e0e8,0 28px 0 #e8e8ee,0 48px 0 #e0e0e8,0 62px 0 #c9c9d4;}
+  .doc-card .doc-label{position:absolute;top:8px;right:8px;background:var(--accent);
+    color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:0.3px;}
+  .doc-card .doc-sigline{position:absolute;left:16px;width:72px;bottom:22px;
+    height:2px;background:var(--line);}
+  /* Подписи на картах стопки */
+  .doc-card .doc-presign{position:absolute;left:14px;bottom:28px;
+    font-family:Georgia,serif;font-style:italic;font-size:10px;color:#14213d;
+    opacity:0;transform:rotate(-2deg);transform-origin:left bottom;white-space:nowrap;line-height:1;}
+  .batch-badge{position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);
+    background:var(--yellow);color:#fff;font-size:12px;font-weight:700;
+    padding:4px 12px;border-radius:20px;white-space:nowrap;opacity:0;}
+
+  /* ПРОФИЛЬ */
+  #profileCard{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(0.9);
+    width:380px;background:var(--panel);border-radius:14px;padding:32px 30px;
+    opacity:0;z-index:40;box-shadow:0 20px 50px rgba(0,0,0,0.5);}
+  .pc-title{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:20px;}
+  .pc-field{margin-bottom:14px;}
+  .pc-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;
+    letter-spacing:0.5px;margin-bottom:5px;}
+  .pc-input{width:100%;padding:10px 14px;border:2px solid #e8e8ee;border-radius:8px;
+    font-size:15px;color:var(--ink);background:#fafafa;min-height:42px;}
+  .pc-input.focused{border-color:var(--accent);}
+  .pc-btn{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;
+    border-radius:8px;font-size:15px;font-weight:600;margin-top:8px;opacity:0;}
+
+  /* ДОКУМЕНТ */
+  #mainDoc{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(0.7);
+    width:340px;height:460px;background:var(--panel);border-radius:8px;
+    box-shadow:0 16px 50px rgba(0,0,0,0.5);opacity:0;padding:28px 26px;overflow:hidden;}
+  .page-tabs{position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);display:flex;gap:5px;}
+  .page-tab{width:28px;height:4px;border-radius:2px;background:rgba(255,255,255,0.25);}
+  .page-tab.active{background:var(--accent);}
+  .txt{height:6px;background:#e8e8ee;border-radius:2px;margin-bottom:9px;}
+  .txt.s{width:55%;}.txt.m{width:80%;}.txt.f{width:100%;}
+  .party-highlight{position:absolute;left:26px;top:72px;right:26px;height:22px;
+    background:rgba(79,124,255,0.18);border-left:3px solid var(--accent);border-radius:3px;opacity:0;}
+  .party-label{position:absolute;left:36px;top:62px;font-size:10px;font-weight:700;
+    color:var(--accent);opacity:0;white-space:nowrap;}
+  #sigAreaClient{position:absolute;left:26px;top:192px;}
+  #sl2{height:2px;background:var(--ink);width:120px;position:relative;}
+  #sl2 .sl-label{position:absolute;top:5px;left:0;font-size:9px;color:var(--ink);font-weight:700;white-space:nowrap;}
+  #sigAreaLeb{position:absolute;left:26px;bottom:32px;}
+  #sl1{height:2px;background:var(--ink);width:160px;position:relative;}
+  #sl1 .sl-label{position:absolute;top:5px;left:0;font-size:9px;color:var(--ink);font-weight:700;white-space:nowrap;}
+  .found-box{position:absolute;border:2px solid var(--accent);border-radius:4px;
+    opacity:0;box-shadow:0 0 0 3px rgba(79,124,255,0.12);}
+  .sig-draw{position:absolute;opacity:0;pointer-events:none;z-index:35;}
+  .sig-draw path{fill:none;stroke:#14213d;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;}
+  #scanline{position:absolute;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,var(--accent),transparent);
+    box-shadow:0 0 14px 2px rgba(79,124,255,0.7);top:28px;opacity:0;pointer-events:none;}
+
+  /* ЛЕВАЯ ПАНЕЛЬ */
+  #reviewPanel{position:absolute;left:40px;top:110px;width:252px;
+    display:flex;flex-direction:column;gap:14px;z-index:40;}
+  #lights{display:flex;flex-direction:column;gap:9px;}
+  .light{display:flex;align-items:center;gap:9px;opacity:0;color:#fff;
+    font-size:13px;font-weight:500;background:rgba(0,0,0,0.4);padding:8px 14px;
+    border-radius:20px;backdrop-filter:blur(4px);}
+  .light .bulb{width:14px;height:14px;border-radius:50%;background:#333;flex-shrink:0;}
+  .light.on .bulb.green{background:var(--green);box-shadow:0 0 10px 1px var(--green);}
+  .light.on .bulb.yellow{background:var(--yellow);box-shadow:0 0 10px 1px var(--yellow);}
+  .review-sub{color:rgba(255,255,255,0.55);font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:0.6px;opacity:0;margin-bottom:-4px;}
+  .rcard{background:var(--card-bg);border-radius:8px;padding:10px 13px;font-size:12px;
+    color:var(--ink);opacity:0;transform:translateX(-20px);
+    box-shadow:0 4px 14px rgba(0,0,0,0.18);border-left:3px solid var(--yellow);}
+  .rcard.ok{border-left-color:var(--green);}
+  .rcard .rc-row{display:flex;align-items:center;gap:7px;}
+  .rcard .rc-ic{font-size:13px;}
+  .rcard .rc-txt{line-height:1.35;}
+
+  /* ПАКЕТ */
+  #batchFlow{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    display:flex;flex-direction:column;gap:10px;align-items:center;opacity:0;}
+  .flow-doc{width:290px;height:44px;background:#fff;border-radius:6px;
+    display:flex;align-items:center;padding:0 14px;gap:12px;
+    box-shadow:0 3px 12px rgba(0,0,0,0.2);}
+  .flow-doc .fd-ico{font-size:18px;}
+  .flow-doc .fd-name{font-size:12px;font-weight:600;color:var(--ink);flex:1;}
+  .flow-doc .fd-status{font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;background:#eee;color:#999;}
+  .batch-progress{font-size:13px;font-weight:600;color:var(--accent);margin-top:6px;opacity:0;}
+
+  #doneCheck{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%) scale(0);
+    width:80px;height:80px;z-index:60;opacity:0;}
+  #counterBadge{position:absolute;left:50%;top:calc(40% + 56px);transform:translateX(-50%);
+    background:var(--green);color:#fff;font-size:15px;font-weight:700;padding:8px 22px;
+    border-radius:20px;opacity:0;z-index:60;box-shadow:0 6px 20px rgba(46,160,67,0.4);white-space:nowrap;}
+  #downloadBtn{position:absolute;left:50%;top:calc(40% + 100px);transform:translateX(-50%);
+    border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:13px;
+    padding:8px 20px;border-radius:20px;opacity:0;z-index:60;white-space:nowrap;}
+
+  .replay{position:absolute;bottom:12px;left:14px;z-index:100;background:rgba(255,255,255,0.08);
+    color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:12px;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="brand" id="brand">SignFinder<span class="dot">.</span></div>
+
+  <!-- СТОПКА с парой готовых подписей -->
+  <div id="stack">
+    <div class="doc-card" style="transform:rotate(-10deg) translate(-44px,16px);z-index:1;">
+      <span class="doc-label">NDA</span>
+      <span class="doc-sigline" id="dsl0"></span>
+    </div>
+    <div class="doc-card" style="transform:rotate(-5deg) translate(-20px,7px);z-index:2;">
+      <span class="doc-label">SOW</span>
+      <span class="doc-sigline" id="dsl1"></span>
+      <span class="doc-presign" id="dps1">Lebedzeu A.</span>
+    </div>
+    <div class="doc-card" style="transform:rotate(4deg) translate(14px,2px);z-index:3;">
+      <span class="doc-label">ADD</span>
+      <span class="doc-sigline" id="dsl2"></span>
+      <span class="doc-presign" id="dps2">Lebedzeu A.</span>
+    </div>
+    <div class="doc-card" style="transform:rotate(0deg);z-index:4;">
+      <span class="doc-label">AGR</span>
+      <span class="doc-sigline" id="dsl3"></span>
+    </div>
+    <div class="batch-badge" id="batchBadge" data-i="batch_badge">47 договоров за месяц</div>
+  </div>
+
+  <!-- ПРОФИЛЬ -->
+  <div id="profileCard">
+    <div class="pc-title" data-i="pc_t">Представьтесь системе — один раз</div>
+    <div class="pc-field">
+      <div class="pc-label" data-i="pc_l1">Ваша компания</div>
+      <div class="pc-input" id="pcCompany"></div>
+    </div>
+    <div class="pc-field">
+      <div class="pc-label" data-i="pc_l2">Подписант</div>
+      <div class="pc-input" id="pcName"></div>
+    </div>
+    <button class="pc-btn" data-i="pc_btn">Готово — начать работу</button>
+  </div>
+
+  <!-- ДОКУМЕНТ -->
+  <div id="mainDoc">
+    <div class="txt m"></div><div class="txt s"></div><div style="height:4px"></div>
+    <div class="txt f"></div><div class="txt m"></div><div class="txt s"></div>
+    <div style="height:8px"></div>
+    <div class="party-highlight" id="partyHL"></div>
+    <div class="party-label" id="partyLabel" data-i="party_lbl">← наша сторона · далее Клиент</div>
+    <!-- Клиент — в середине -->
+    <div id="sigAreaClient"><div id="sl2"><span class="sl-label" data-i="sl2">Клиент</span></div></div>
+    <div class="found-box" id="fb2" style="left:26px;top:184px;width:130px;height:36px;"></div>
+    <svg class="sig-draw" id="sig2" viewBox="0 0 180 65" style="left:28px;top:144px;width:120px;">
+      <path id="sig2p" d="M10,42 C16,22 54,13 98,17 C132,20 156,27 148,34 C140,41 50,30 34,30 C26,30 40,52 44,56 M34,38 C60,33 104,39 128,41 C142,42 152,44 145,47 C128,50 96,44 84,45 C106,46 122,48 140,50"/>
+    </svg>
+    <div style="height:10px"></div>
+    <div class="txt m"></div><div class="txt f"></div><div class="txt s"></div>
+    <div class="txt m"></div><div style="height:8px"></div>
+    <div class="txt f"></div><div class="txt s"></div>
+    <!-- Лебедев — внизу -->
+    <div id="sigAreaLeb"><div id="sl1"><span class="sl-label" data-i="sl1">А. П. Лебедев</span></div></div>
+    <div class="found-box" id="fb1" style="left:26px;bottom:24px;width:170px;height:40px;"></div>
+    <svg class="sig-draw" id="sig1" viewBox="0 0 200 70" style="left:28px;bottom:32px;width:160px;">
+      <path id="sig1p" d="M14,42 C20,20 70,12 120,16 C160,19 188,26 180,34 C172,42 60,30 40,30 C30,30 48,58 52,62 M40,40 C70,36 120,40 150,42 C165,43 175,45 168,48 C150,52 110,46 95,47 C120,48 140,50 158,52"/>
+    </svg>
+    <div id="scanline"></div>
+    <div class="page-tabs">
+      <div class="page-tab active"></div><div class="page-tab"></div><div class="page-tab"></div>
+    </div>
+  </div>
+
+  <!-- ЛЕВАЯ ПАНЕЛЬ -->
+  <div id="reviewPanel">
+    <div id="lights">
+      <div class="light" id="lightSign"><span class="bulb green"></span><span data-i="l_sign">Места подписи найдены</span></div>
+      <div class="light" id="lightReview"><span class="bulb yellow"></span><span data-i="l_review">Ревью договора</span></div>
+    </div>
+    <div class="review-sub" id="reviewSub" data-i="review_sub">Замечания юриста</div>
+    <div class="rcard" id="rc1"><div class="rc-row"><span class="rc-ic">⚠️</span><span class="rc-txt" data-i="rc1">Срок договора не указан явно (п. 4.2)</span></div></div>
+    <div class="rcard ok" id="rc2"><div class="rc-row"><span class="rc-ic">✓</span><span class="rc-txt" data-i="rc2">Стороны идентифицированы</span></div></div>
+    <div class="rcard" id="rc3"><div class="rc-row"><span class="rc-ic">⚠️</span><span class="rc-txt" data-i="rc3">Проверьте порядок расчётов</span></div></div>
+  </div>
+
+  <!-- ПАКЕТ -->
+  <div id="batchFlow">
+    <div class="flow-doc" id="fd1"><span class="fd-ico">📄</span><span class="fd-name" data-i="fd1">Agreement_2026_01.pdf</span><span class="fd-status" id="fd1s">...</span></div>
+    <div class="flow-doc" id="fd2"><span class="fd-ico">📄</span><span class="fd-name" data-i="fd2">SOW_Client_Feb.pdf</span><span class="fd-status" id="fd2s">...</span></div>
+    <div class="flow-doc" id="fd3"><span class="fd-ico">📄</span><span class="fd-name" data-i="fd3">Addendum_No3.pdf</span><span class="fd-status" id="fd3s">...</span></div>
+    <div class="flow-doc" id="fd4"><span class="fd-ico">📄</span><span class="fd-name" data-i="fd4">NDA_Partner_Mar.pdf</span><span class="fd-status" id="fd4s">...</span></div>
+    <div class="batch-progress" id="batchProgress">1 / 47</div>
+  </div>
+
+  <svg id="doneCheck" viewBox="0 0 80 80">
+    <circle cx="40" cy="40" r="37" fill="none" stroke="#2ea043" stroke-width="4"/>
+    <path d="M22,40 L35,53 L58,28" fill="none" stroke="#2ea043" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div id="counterBadge" data-i="counter">✓ 47 договоров подписано</div>
+  <div id="downloadBtn" data-i="dl">⬇ Скачать все PDF</div>
+
+  <div class="caption" id="caption"></div>
+  <button class="replay" onclick="play()">↻</button>
+</div>
+
+<script>
+const I18N={
+  ru:{
+    c_stack:"Стопка за месяц. На каждом — подпись вручную.",
+    c0:"Один раз настройте — система запомнит",
+    c2:"Загружаем всё сразу",
+    c3:"ИИ читает как юрист · находит вашу сторону",
+    c4:"Находит все места подписи",
+    c5:"И подписывает за вас",
+    c6:"Весь пакет — за минуты",
+    c7:"Все договоры готовы",
+    pc_t:"Представьтесь системе — один раз",
+    pc_l1:"Ваша компания",pc_l2:"Подписант",
+    pc_company:"Vertex Group Ltd",pc_name:"А. П. Лебедев",
+    pc_btn:"Готово — начать работу",
+    batch_badge:"47 договоров за месяц",
+    party_lbl:"← наша сторона · далее Клиент",
+    sl1:"А. П. Лебедев",sl2:"Клиент",
+    l_review:"Ревью договора",l_sign:"Места подписи найдены",
+    review_sub:"Замечания юриста",
+    rc1:"Срок договора не указан явно (п. 4.2)",
+    rc2:"Стороны идентифицированы",
+    rc3:"Проверьте порядок расчётов",
+    fd1:"Agreement_2026_01.pdf",fd2:"SOW_Client_Feb.pdf",
+    fd3:"Addendum_No3.pdf",fd4:"NDA_Partner_Mar.pdf",
+    signed:"✓ подписан",review_needed:"⚠ проверить",
+    counter:"✓ 47 договоров подписано",dl:"⬇ Скачать все PDF",
+  },
+  en:{
+    c_stack:"Month-end stack. Each one — signed by hand.",
+    c0:"Set it up once — system remembers you",
+    c2:"Upload everything at once",
+    c3:"AI reads it like a lawyer · found your party",
+    c4:"Finds all signature spots",
+    c5:"And signs for you",
+    c6:"The whole batch — in minutes",
+    c7:"All contracts ready",
+    pc_t:"Introduce yourself — just once",
+    pc_l1:"Your company",pc_l2:"Signatory",
+    pc_company:"Vertex Group Ltd",pc_name:"Lebedzeu A.",
+    pc_btn:"Done — start working",
+    batch_badge:"47 contracts this month",
+    party_lbl:"← our party · referred to as Client",
+    sl1:"Lebedzeu A.",sl2:"Client",
+    l_review:"Contract review",l_sign:"Spots found",
+    review_sub:"Lawyer's remarks",
+    rc1:"Contract term not specified (cl. 4.2)",
+    rc2:"Parties identified",
+    rc3:"Check payment schedule",
+    fd1:"Agreement_2026_01.pdf",fd2:"SOW_Client_Feb.pdf",
+    fd3:"Addendum_No3.pdf",fd4:"NDA_Partner_Mar.pdf",
+    signed:"✓ signed",review_needed:"⚠ review",
+    counter:"✓ 47 contracts signed",dl:"⬇ Download all PDFs",
+  }
+};
+
+let lang="ru";
+function setLang(l){
+  lang=l;
+  document.querySelectorAll("[data-i]").forEach(el=>{
+    const k=el.dataset.i;if(I18N[l][k]!==undefined)el.textContent=I18N[l][k];
+  });
+  play();
+}
+
+// Принять язык от родительского окна (лендинг)
+window.addEventListener("message",(e)=>{
+  if(e.data&&e.data.type==="setLang"&&I18N[e.data.lang]){
+    setLang(e.data.lang);
+  }
+});
+
+const STAGE_W=1280,STAGE_H=560;
+function scaleStage(){
+  const s=document.getElementById("stage");
+  const ww=window.innerWidth,wh=window.innerHeight;
+  const sc=Math.min(ww/STAGE_W,wh/STAGE_H);
+  const ox=(ww-STAGE_W*sc)/2,oy=(wh-STAGE_H*sc)/2;
+  s.style.transform=`translate(${ox}px,${oy}px) scale(${sc})`;
+  s.style.top="0";s.style.left="0";
+}
+window.addEventListener("resize",scaleStage);
+
+const $=id=>document.getElementById(id);
+const caption=$("caption");
+let timers=[];
+function at(ms,fn){timers.push(setTimeout(fn,ms));}
+function showC(k){caption.textContent=I18N[lang][k];caption.style.transition="opacity 0.35s";caption.style.opacity=1;}
+function hideC(){caption.style.transition="opacity 0.35s";caption.style.opacity=0;}
+
+function typeInto(id,text,speed,cb){
+  const el=$(id);el.textContent="";let i=0;
+  const t=setInterval(()=>{
+    if(i>=text.length){clearInterval(t);if(cb)cb();return;}
+    el.textContent+=text[i++];
+  },speed);
+  timers.push(t);
+}
+function prepSig(pid){
+  const p=$(pid);const len=p.getTotalLength();
+  p.style.transition="none";p.style.strokeDasharray=len;p.style.strokeDashoffset=len;
+}
+function drawSig(svgId,pid,dur){
+  const svg=$(svgId);svg.style.transition="opacity 0.2s";svg.style.opacity=1;
+  const p=$(pid);void p.getBoundingClientRect();
+  p.style.transition=`stroke-dashoffset ${dur}s ease-in-out`;p.style.strokeDashoffset=0;
+}
+function setStatus(id,type){
+  const s=$(id+"s");if(!s)return;
+  if(type==="signed"){s.style.background="var(--green-soft)";s.style.color="var(--green)";s.textContent=I18N[lang].signed;}
+  else{s.style.background="var(--yellow-soft)";s.style.color="var(--yellow)";s.textContent=I18N[lang].review_needed;}
+}
+
+function reset(){
+  timers.forEach(t=>clearTimeout(t));timers=[];
+  caption.style.opacity=0;
+  // Стопка
+  $("stack").style.cssText="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:1;transition:none;";
+  document.querySelectorAll(".doc-card").forEach(d=>d.style.opacity=1);
+  document.querySelectorAll(".doc-sigline").forEach(sl=>{sl.style.background="var(--line)";sl.style.width="72px";sl.style.transition="none";});
+  // Показываем пару готовых подписей на стопке
+  ["dps1","dps2"].forEach(id=>{const el=$(id);if(el)el.style.opacity=0.85;});
+  $("batchBadge").style.opacity=0;
+  // Профиль
+  $("profileCard").style.cssText="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(0.9);width:380px;background:#fff;border-radius:14px;padding:32px 30px;opacity:0;z-index:40;box-shadow:0 20px 50px rgba(0,0,0,0.5);";
+  $("pcCompany").textContent="";$("pcName").textContent="";
+  document.querySelector(".pc-btn").style.opacity=0;
+  // Документ
+  $("mainDoc").style.cssText="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(0.7);width:340px;height:460px;background:#fff;border-radius:8px;box-shadow:0 16px 50px rgba(0,0,0,0.5);opacity:0;padding:28px 26px;overflow:hidden;";
+  $("partyHL").style.opacity=0;$("partyLabel").style.opacity=0;
+  $("scanline").style.cssText="position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);box-shadow:0 0 14px 2px rgba(79,124,255,0.7);top:28px;opacity:0;pointer-events:none;";
+  ["rc1","rc2","rc3"].forEach(id=>{$(id).style.opacity=0;$(id).style.transform="translateX(-20px)";});
+  ["fb1","fb2","sig1","sig2"].forEach(id=>$(id).style.opacity=0);
+  $("reviewSub").style.opacity=0;
+  ["lightSign","lightReview"].forEach(id=>{$(id).classList.remove("on");$(id).style.opacity=0;});
+  // Пакет
+  $("batchFlow").style.opacity=0;
+  ["fd1","fd2","fd3","fd4"].forEach(id=>{
+    $(id).style.opacity=0;$(id).style.transform="translateX(-40px)";
+    const s=$(id+"s");if(s){s.textContent="...";s.style.background="#eee";s.style.color="#999";}
+  });
+  $("batchProgress").style.opacity=0;
+  $("doneCheck").style.cssText="position:absolute;left:50%;top:40%;transform:translate(-50%,-50%) scale(0);width:80px;height:80px;z-index:60;opacity:0;";
+  $("counterBadge").style.opacity=0;$("downloadBtn").style.opacity=0;
+  $("brand").style.opacity=0;
+  prepSig("sig1p");prepSig("sig2p");
+}
+
+// ─── Все тайминги: оригинал ×1.09 (= ×1.2 / 1.1) ───
+function play(){
+  reset();
+  void $("stage").offsetWidth;
+
+  // БРЕНД
+  at(220,()=>{$("brand").style.transition="opacity 0.5s";$("brand").style.opacity=1;});
+
+  // ══ СТОПКА / БОЛЬ (0-4.6с) ══
+  at(330,()=>showC("c_stack"));
+  // Мигаем линиями подписи на каждом листе
+  [0,1,2,3].forEach(i=>{
+    at(640+i*500,()=>{
+      const sl=document.getElementById("dsl"+i);if(!sl)return;
+      sl.style.transition="background 0.25s, width 0.25s";
+      sl.style.background="var(--yellow)";sl.style.width="90px";
+      at(410,()=>{sl.style.background="var(--line)";sl.style.width="72px";});
+    });
+  });
+  at(2640,()=>{$("batchBadge").style.transition="opacity 0.4s";$("batchBadge").style.opacity=1;});
+  at(4150,()=>{
+    hideC();$("batchBadge").style.opacity=0;
+    const s=$("stack");s.style.transition="opacity 0.4s, transform 0.4s";
+    s.style.opacity=0;s.style.transform="translate(-50%,-50%) scale(0.8)";
+  });
+
+  // ══ ПРОФИЛЬ (4.9-9.1с) ══
+  at(4480,()=>{
+    showC("c0");
+    const pc=$("profileCard");
+    pc.style.transition="opacity 0.5s, transform 0.5s cubic-bezier(.2,1,.4,1)";
+    pc.style.opacity=1;pc.style.transform="translate(-50%,-50%) scale(1)";
+  });
+  at(4910,()=>{$("pcCompany").classList.add("focused");typeInto("pcCompany",I18N[lang].pc_company,60);});
+  at(6280,()=>{$("pcCompany").classList.remove("focused");$("pcName").classList.add("focused");typeInto("pcName",I18N[lang].pc_name,66);});
+  at(7310,()=>{$("pcName").classList.remove("focused");document.querySelector(".pc-btn").style.transition="opacity 0.4s";document.querySelector(".pc-btn").style.opacity=1;});
+  at(7960,()=>{
+    hideC();
+    const pc=$("profileCard");pc.style.transition="opacity 0.4s, transform 0.4s";
+    pc.style.opacity=0;pc.style.transform="translate(-50%,-50%) scale(0.95)";
+  });
+
+  // ══ ЗАГРУЗКА (8.3-10.2с) ══
+  at(8290,()=>{
+    showC("c2");
+    const md=$("mainDoc");
+    md.style.transition="opacity 0.5s, transform 0.5s cubic-bezier(.2,.9,.4,1)";
+    md.style.opacity=1;md.style.transform="translate(-50%,-50%) scale(1)";
+  });
+  at(9930,()=>hideC());
+
+  // ══ СКАНИРОВАНИЕ + РЕВЬЮ (10.4-16.5с) ══
+  at(10370,()=>{
+    showC("c3");
+    const sl=$("scanline");sl.style.opacity=1;sl.style.transition="top 2.2s linear";sl.style.top="430px";
+  });
+  at(11460,()=>{$("partyHL").style.transition="opacity 0.4s";$("partyHL").style.opacity=1;$("partyLabel").style.transition="opacity 0.4s";$("partyLabel").style.opacity=1;});
+  at(11780,()=>{const lr=$("lightReview");lr.style.transition="opacity 0.4s";lr.style.opacity=1;at(200,()=>lr.classList.add("on"));});
+  at(12110,()=>{$("reviewSub").style.transition="opacity 0.4s";$("reviewSub").style.opacity=1;});
+  at(12330,()=>{const r=$("rc2");r.style.transition="all 0.4s";r.style.opacity=1;r.style.transform="translateX(0)";});
+  at(12880,()=>{const r=$("rc1");r.style.transition="all 0.4s";r.style.opacity=1;r.style.transform="translateX(0)";});
+  at(13420,()=>{const r=$("rc3");r.style.transition="all 0.4s";r.style.opacity=1;r.style.transform="translateX(0)";});
+  at(16150,()=>{hideC();$("scanline").style.opacity=0;});
+
+  // ══ МЕСТА ПОДПИСИ (16.7-21с) ══
+  at(16690,()=>{
+    showC("c4");
+    $("fb1").style.transition="opacity 0.4s";$("fb1").style.opacity=1;
+    at(440,()=>{$("fb2").style.transition="opacity 0.4s";$("fb2").style.opacity=1;});
+  });
+  at(17350,()=>{const ls=$("lightSign");ls.style.transition="opacity 0.4s";ls.style.opacity=1;at(180,()=>ls.classList.add("on"));});
+  at(20730,()=>hideC());
+
+  // ══ ПОДПИСЬ РИСУЕТСЯ (21.3-25.9с) ══
+  at(21280,()=>showC("c5"));
+  at(21600,()=>{$("fb1").style.opacity=0;drawSig("sig1","sig1p",1.8);});
+  at(23460,()=>{$("fb2").style.opacity=0;drawSig("sig2","sig2p",1.8);});
+  at(25970,()=>hideC());
+
+  // ══ ПАКЕТНЫЙ ПОТОК (26.4-31.8с) ══
+  at(26400,()=>{
+    showC("c6");
+    const md=$("mainDoc");md.style.transition="opacity 0.5s, transform 0.5s";
+    md.style.opacity=0;md.style.transform="translate(-50%,-50%) scale(0.85)";
+    $("lightSign").style.opacity=0;$("lightReview").style.opacity=0;$("reviewSub").style.opacity=0;
+    ["rc1","rc2","rc3"].forEach(id=>$(id).style.opacity=0);
+    const bf=$("batchFlow");bf.style.transition="opacity 0.5s";bf.style.opacity=1;
+  });
+  const flows=[
+    {id:"fd1",type:"signed", prog:"1 / 47"},
+    {id:"fd2",type:"signed", prog:"8 / 47"},
+    {id:"fd3",type:"review", prog:"23 / 47"},
+    {id:"fd4",type:"signed", prog:"47 / 47"},
+  ];
+  flows.forEach(({id,type,prog},i)=>{
+    at(26840+i*760,()=>{const el=$(id);el.style.transition="opacity 0.35s, transform 0.35s";el.style.opacity=1;el.style.transform="translateX(0)";});
+    at(27110+i*760,()=>{setStatus(id,type);const bp=$("batchProgress");bp.style.transition="opacity 0.3s";bp.style.opacity=1;bp.textContent=prog;});
+  });
+  at(31640,()=>hideC());
+
+  // ══ ГОТОВО (32.3-37с) ══
+  at(32290,()=>{
+    showC("c7");
+    const bf=$("batchFlow");bf.style.transition="opacity 0.4s";bf.style.opacity=0;
+    const dc=$("doneCheck");
+    dc.style.transition="opacity 0.5s, transform 0.5s cubic-bezier(.2,1.4,.4,1)";
+    dc.style.opacity=1;dc.style.transform="translate(-50%,-50%) scale(1)";
+    at(440,()=>{const cb=$("counterBadge");cb.style.transition="opacity 0.5s";cb.style.opacity=1;});
+    at(760,()=>{const dl=$("downloadBtn");dl.style.transition="opacity 0.5s";dl.style.opacity=1;});
+  });
+
+  // ПЕТЛЯ ~37с
+  at(37100,()=>play());
+}
+
+// Читаем URL-параметр при первой загрузке
+const urlLang=new URLSearchParams(window.location.search).get("lang")||"ru";
+window.addEventListener("load",()=>{scaleStage();setLang(urlLang);});
+</script>
+</body>
+</html>

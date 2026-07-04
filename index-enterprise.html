@@ -1,0 +1,631 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignFinder Enterprise — обработка договоров на потоке</title>
+<script>
+  !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+" (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||(window.posthog=[]));
+  posthog.init('phc_sfzS6t6xSSifT8ibLFjNpwxg6gjY8yAd6HK9DfPoYHJD', {api_host: 'https://eu.i.posthog.com', capture_pageview: false});
+</script>
+<style>
+  /* ВЕРСИЯ ENTERPRISE / АГЕНТСТВА — строгая, корпоративная, надёжная */
+  :root {
+    --bg: #0a0e14;
+    --bg-soft: #111722;
+    --panel: #151c28;
+    --panel-2: #1a2230;
+    --ink: #e8edf4;
+    --muted: #94a0b0;
+    --accent: #3b6fd4;        /* стальной синий */
+    --accent-hover: #4d82e8;
+    --accent-soft: rgba(59,111,212,0.12);
+    --steel: #5a6b82;
+    --green: #2ea043;
+    --border: #232d3d;
+    --border-bright: #2e3a4d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+  a { color: inherit; text-decoration: none; }
+
+  header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(10,14,20,0.9); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+  .logo { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+  .logo .dot { color: var(--accent); }
+  .logo .badge {
+    font-size: 11px; font-weight: 600; color: var(--steel); border: 1px solid var(--border-bright);
+    padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .nav-lang { display: flex; gap: 4px; }
+  .nav-lang button {
+    background: transparent; border: 1px solid var(--border-bright); color: var(--muted);
+    padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  .nav-lang button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .nav-cta {
+    background: var(--accent); color: #fff; padding: 9px 18px; border-radius: 8px;
+    font-size: 14px; font-weight: 600; cursor: pointer; border: none;
+  }
+  .nav-cta:hover { background: var(--accent-hover); }
+
+  .hero { padding: 72px 0 48px; text-align: center; }
+  .hero-grid { display: block; }
+  .hero-top { max-width: 760px; margin: 0 auto; }
+  .hero .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; color: var(--accent);
+    font-size: 13px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 20px;
+    justify-content: center;
+  }
+  .hero h1 { font-size: 46px; font-weight: 800; letter-spacing: -1.2px; line-height: 1.14; margin-bottom: 20px; }
+  .hero h1 .hl { color: var(--accent); }
+  .hero .sub { font-size: 19px; color: var(--muted); margin-bottom: 32px; }
+  .cta-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    display: inline-block; padding: 14px 26px; border-radius: 8px;
+    font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-outline { background: transparent; color: var(--ink); border: 1px solid var(--border-bright); }
+  .btn-outline:hover { border-color: var(--accent); background: var(--accent-soft); }
+
+  .hero-visual {
+    border: 1px solid var(--border-bright); border-radius: 14px; overflow: hidden;
+    aspect-ratio: 16 / 7; background: #0d1117; box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    max-width: 960px; margin: 48px auto 0;
+  }
+  .hero-visual iframe { width: 100%; height: 100%; border: none; display: block; }
+
+  /* Полоса доверия */
+  .trust-bar {
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    background: var(--bg-soft); padding: 24px 0;
+  }
+  .trust-items { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px; }
+  .trust-item { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; font-weight: 500; }
+  .trust-item .ti-ico { color: var(--accent); font-size: 18px; }
+
+  section { padding: 80px 0; }
+  .section-head { text-align: center; margin-bottom: 52px; }
+  .section-head .kicker { color: var(--accent); font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+  .section-title { font-size: 34px; font-weight: 700; letter-spacing: -0.7px; margin-bottom: 12px; }
+  .section-lead { color: var(--muted); font-size: 17px; max-width: 620px; margin: 0 auto; }
+
+  /* Контроль/безопасность — главный блок */
+  .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .pillar { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 32px 28px; }
+  .pillar .p-ico {
+    width: 52px; height: 52px; border-radius: 12px; background: var(--accent-soft);
+    display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 20px;
+  }
+  .pillar h3 { font-size: 20px; margin-bottom: 10px; }
+  .pillar p { color: var(--muted); font-size: 15px; }
+
+  /* Локальная установка — выделенный блок */
+  .deploy-block {
+    background: linear-gradient(135deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--border-bright); border-radius: 18px; padding: 48px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center;
+  }
+  .deploy-block h3 { font-size: 28px; margin-bottom: 16px; letter-spacing: -0.5px; }
+  .deploy-block p { color: var(--muted); font-size: 16px; margin-bottom: 16px; }
+  .deploy-list { list-style: none; }
+  .deploy-list li { padding: 8px 0 8px 28px; position: relative; color: var(--ink); font-size: 15px; }
+  .deploy-list li::before { content: "→"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+  .deploy-visual {
+    background: #0d1117; border: 1px solid var(--border-bright); border-radius: 12px;
+    padding: 24px; font-family: "SF Mono", Menlo, monospace; font-size: 13px; color: var(--steel);
+  }
+  .deploy-visual .line { padding: 3px 0; }
+  .deploy-visual .prompt { color: var(--accent); }
+  .deploy-visual .ok { color: var(--green); }
+
+  /* Объём / для кого */
+  .volume { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .vol-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 30px 26px; }
+  .vol-card .vc-ico { font-size: 30px; margin-bottom: 16px; }
+  .vol-card h3 { font-size: 18px; margin-bottom: 8px; }
+  .vol-card p { color: var(--muted); font-size: 14px; }
+
+  /* Фичи-таблица */
+  .feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .feat { display: flex; gap: 16px; padding: 24px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+  .feat .f-ico { font-size: 24px; color: var(--accent); flex-shrink: 0; }
+  .feat h4 { font-size: 17px; margin-bottom: 6px; }
+  .feat p { color: var(--muted); font-size: 14px; }
+
+  /* CTA-блок демо */
+  .demo-cta {
+    background: linear-gradient(135deg, var(--accent-soft), var(--panel));
+    border: 1px solid var(--accent); border-radius: 18px; padding: 52px 44px; text-align: center;
+  }
+  .demo-cta h2 { font-size: 32px; font-weight: 700; margin-bottom: 14px; letter-spacing: -0.5px; }
+  .demo-cta p { color: var(--muted); font-size: 17px; margin-bottom: 32px; max-width: 560px; margin-left: auto; margin-right: auto; }
+  .demo-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .secondary-link { display: block; margin-top: 20px; color: var(--steel); font-size: 14px; }
+  .secondary-link a { color: var(--accent); }
+
+  .disclaimer {
+    background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 22px; margin-top: 40px; font-size: 13px; color: var(--muted);
+  }
+  .disclaimer strong { color: var(--ink); }
+
+  footer { border-top: 1px solid var(--border); padding: 40px 0; text-align: center; color: var(--muted); font-size: 14px; }
+
+  @media (max-width: 820px) {
+    .hero-grid, .deploy-block { grid-template-columns: 1fr; }
+    .pillars, .volume, .feat-grid { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 34px; }
+  }
+
+  /* Sandbox demo (enterprise) */
+  .sandbox-demo { max-width: 900px; margin: 0 auto; }
+  .sandbox-demo-header { text-align: center; margin-bottom: 32px; }
+  .sandbox-demo-header h2 { font-size: 28px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.5px; }
+  .sandbox-demo-header p { color: var(--muted); font-size: 16px; }
+  .sandbox-demo-badge { display: inline-block; background: rgba(99,179,237,0.15); color: var(--accent); font-size: 12px; font-weight: 600; padding: 3px 12px; border-radius: 20px; margin-bottom: 12px; }
+  .sandbox-layout { display: grid; grid-template-columns: 1fr 320px; gap: 28px; align-items: start; }
+  .demo-preview-wrap { position: relative; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.2); }
+  .demo-preview-wrap img { width: 100%; display: block; }
+  .demo-panel { display: flex; flex-direction: column; gap: 14px; }
+  .demo-info-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; font-size: 13px; }
+  .demo-info-card .di-label { font-weight: 700; margin-bottom: 4px; color: var(--ink); }
+  .demo-info-card .di-val { color: var(--muted); }
+  .demo-note { font-size: 12px; color: var(--muted); text-align: center; }
+  .spinner-overlay { display: none; position: absolute; inset: 0; background: rgba(20,25,40,0.85); z-index: 10; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+  .spinner-overlay.active { display: flex; }
+  .spinner-ring { width: 44px; height: 44px; border: 3px solid rgba(99,179,237,0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner-text { font-size: 15px; color: var(--accent); font-weight: 600; }
+  .tl-row { display: flex; flex-direction: column; gap: 8px; }
+  .tl-item { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; font-size: 13px; font-weight: 600; }
+  .tl-dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
+  .tl-dot.green { background: #22c55e; }
+  .tl-dot.yellow { background: #f59e0b; }
+  .remarks { display: flex; flex-direction: column; gap: 7px; }
+  .remark-card { display: flex; align-items: flex-start; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 13px; line-height: 1.4; }
+  .remark-bar { width: 4px; min-height: 100%; border-radius: 2px; align-self: stretch; flex-shrink: 0; }
+  .remark-bar.warning { background: #f59e0b; }
+  .remark-bar.ok { background: #22c55e; }
+  .dropzone-soon { border: 2px dashed var(--border); border-radius: 12px; padding: 22px 18px; text-align: center; color: var(--muted); font-size: 13px; }
+  .dropzone-soon .ds-title { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+  .result-section { display: none; flex-direction: column; gap: 10px; }
+  .result-section.active { display: flex; }
+  .download-btn { width: 100%; padding: 12px; font-size: 15px; text-align: center; text-decoration: none; }
+  @media (max-width: 760px) { .sandbox-layout { grid-template-columns: 1fr; } }
+  /* Upload Zone CTA — links out to the cabinet */
+  .uz-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 4px; }
+  .uz-drop { display: block; border: 2px dashed var(--border); border-radius: 10px; padding: 28px 20px; text-align: center; cursor: pointer; text-decoration: none; color: inherit; transition: background 0.15s, transform 0.15s, box-shadow 0.15s; margin: 14px; }
+  .uz-drop:hover { background: rgba(99,179,237,0.08); border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.18); }
+  .uz-drop-ico { font-size: 28px; margin-bottom: 8px; }
+  .uz-drop-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .uz-drop-limits { font-size: 12px; color: var(--muted); }
+  .uz-privacy { font-size: 11px; color: var(--muted); text-align: center; padding: 8px 16px 14px; border-top: 1px solid var(--border); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--ink); padding: 9px 18px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <div class="logo">SignFinder<span class="dot">.</span><span class="badge">Enterprise</span></div>
+    <div class="nav-right">
+        <a href="/" style="font-size:14px;color:var(--muted);font-weight:500;white-space:nowrap;margin-right:8px;" data-i="nav_cloud">Для частных специалистов →</a>
+      <div class="nav-lang">
+        <button class="active" data-lang="ru" onclick="setLang('ru')">RU</button>
+        <button data-lang="en" onclick="setLang('en')">EN</button>
+      </div>
+      <button class="nav-cta" data-i="nav_cta" onclick="requestDemo()">Запросить демо</button>
+    </div>
+  </div>
+</header>
+
+<div class="hero wrap">
+  <div class="hero-grid">
+    <div class="hero-top">
+      <div class="eyebrow"><span>▰</span><span data-i="eyebrow">Для агентств и юридических отделов</span></div>
+      <h1 data-i="h1">Договоры на потоке —<br><span class="hl">под вашим контролем</span></h1>
+      <p class="sub" data-i="sub" style="max-width:680px;margin:0 auto 32px;">SignFinder находит места подписи, проверяет договоры и расставляет факсимиле — десятки документов за минуты. Разворачивается в вашем контуре: данные не покидают периметр.</p>
+      <div class="cta-row">
+        <button class="btn btn-primary" data-i="cta1" onclick="requestDemo()">Запросить демо</button>
+        <button class="btn btn-outline" data-i="cta2" onclick="document.getElementById('deploy').scrollIntoView({behavior:'smooth'})">Локальная установка</button>
+      </div>
+    </div>
+    <div class="hero-visual"><iframe src="hero.html" title="demo"></iframe></div>
+  </div>
+</div>
+
+<div class="trust-bar">
+  <div class="wrap trust-items">
+    <div class="trust-item"><span class="ti-ico">🔒</span><span data-i="t1">Данные в вашем контуре</span></div>
+    <div class="trust-item"><span class="ti-ico">📦</span><span data-i="t2">Локальная установка</span></div>
+    <div class="trust-item"><span class="ti-ico">🌐</span><span data-i="t3">4 языка + двуязычные</span></div>
+    <div class="trust-item"><span class="ti-ico">⚡</span><span data-i="t4">До 100 договоров за пакет</span></div>
+  </div>
+</div>
+
+<!-- КОНТРОЛЬ / БЕЗОПАСНОСТЬ -->
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker" data-i="pil_k">Безопасность и контроль</div>
+      <h2 class="section-title" data-i="pil_t">Ваши договоры не уходят на сторону</h2>
+      <p class="section-lead" data-i="pil_l">Коммерческие условия, реквизиты, персональные данные — всё остаётся в вашем периметре.</p>
+    </div>
+    <div class="pillars">
+      <div class="pillar">
+        <div class="p-ico">🔒</div>
+        <h3 data-i="pil1t">Замкнутый контур</h3>
+        <p data-i="pil1p">Развёртывание на вашей инфраструктуре. Документы и ключи не покидают периметр компании.</p>
+      </div>
+      <div class="pillar">
+        <div class="p-ico">📋</div>
+        <h3 data-i="pil2t">Аудит и контроль</h3>
+        <p data-i="pil2p">Каждое подписание фиксируется. Оператор проверяет спорные случаи перед отправкой.</p>
+      </div>
+      <div class="pillar">
+        <div class="p-ico">⚙️</div>
+        <h3 data-i="pil3t">Под ваши процессы</h3>
+        <p data-i="pil3p">Почтовый агент, пакетная обработка, шаблоны под ваши типовые договоры.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ЛОКАЛЬНАЯ УСТАНОВКА -->
+<section class="soft" id="deploy" style="background:var(--bg-soft);">
+  <div class="wrap">
+    <div class="deploy-block">
+      <div>
+        <h3 data-i="dep_t">Разворачивается в вашем контуре</h3>
+        <p data-i="dep_p">Не SaaS, куда нужно загружать конфиденциальные договоры. SignFinder ставится на вашем сервере одной командой — в Docker.</p>
+        <ul class="deploy-list">
+          <li data-i="dep1">Данные остаются внутри компании</li>
+          <li data-i="dep2">Свой ключ LLM-провайдера — биллинг напрямую</li>
+          <li data-i="dep3">Поддержка при внедрении и настройке</li>
+          <li data-i="dep4">Обновления по вашему графику</li>
+        </ul>
+      </div>
+      <div class="deploy-visual">
+        <div class="line"><span class="prompt">$</span> git clone signfinder</div>
+        <div class="line"><span class="prompt">$</span> docker compose up -d</div>
+        <div class="line ok">✓ api started :8000</div>
+        <div class="line ok">✓ streamlit :8501</div>
+        <div class="line ok">✓ mail agent :9000</div>
+        <div class="line" style="margin-top:8px; color:var(--ink);" data-i="dep_ready">Готово к работе.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ОБЪЁМ / ДЛЯ КОГО -->
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker" data-i="vol_k">Для кого</div>
+      <h2 class="section-title" data-i="vol_t">Когда договоров много и они однотипные</h2>
+      <p class="section-lead" data-i="vol_l">Поток входящих документов, который сейчас обрабатывается вручную.</p>
+    </div>
+    <div class="volume">
+      <div class="vol-card"><div class="vc-ico">🏢</div><h3 data-i="v1t">Аутстафф и аутсорс</h3><p data-i="v1p">Десятки SOW, аддендумов и приложений в месяц с разными заказчиками и в разных юрисдикциях.</p></div>
+      <div class="vol-card"><div class="vc-ico">⚖️</div><h3 data-i="v2t">Юридические отделы</h3><p data-i="v2p">Входящие договоры на проверку и подпись. Контроль целостности до подписания.</p></div>
+      <div class="vol-card"><div class="vc-ico">📊</div><h3 data-i="v3t">Бэк-офис и операции</h3><p data-i="v3p">Акты, договоры, приложения на потоке. Пакетная обработка и почтовый агент.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ФИЧИ -->
+<section class="soft" style="background:var(--bg-soft);">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker" data-i="feat_k">Возможности</div>
+      <h2 class="section-title" data-i="feat_t">Не редактор PDF — конвейер подписания</h2>
+    </div>
+    <div class="feat-grid">
+      <div class="feat"><div class="f-ico">🎯</div><div><h4 data-i="f1t">Поиск по смыслу</h4><p data-i="f1p">Привязка к тексту договора, а не к координатам. Работает на вариациях одного шаблона.</p></div></div>
+      <div class="feat"><div class="f-ico">📋</div><div><h4 data-i="f2t">Pre-flight ревью</h4><p data-i="f2p">Проверка целостности договора под юрисдикцию: стороны, сроки, расчёты, ответственность.</p></div></div>
+      <div class="feat"><div class="f-ico">📧</div><div><h4 data-i="f3t">Почтовый агент</h4><p data-i="f3p">Автоматическая обработка входящих писем с договорами. Светофор green/yellow/red.</p></div></div>
+      <div class="feat"><div class="f-ico">🗂️</div><div><h4 data-i="f4t">Пакетная обработка</h4><p data-i="f4p">До 100 договоров за раз. Шаблоны и распознавание похожих документов.</p></div></div>
+      <div class="feat"><div class="f-ico">🌐</div><div><h4 data-i="f5t">Языки и юрисдикции</h4><p data-i="f5p">RU, EN, PL, MK. Двуязычные договоры в две колонки. Профили подписантов.</p></div></div>
+      <div class="feat"><div class="f-ico">🔌</div><div><h4 data-i="f6t">API-доступ</h4><p data-i="f6p">REST API поверх движка. Интеграция в ваши системы и процессы.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO CTA -->
+<section id="demo-section">
+  <div class="wrap">
+    <div class="demo-cta">
+      <h2 data-i="demo_t">Покажем на ваших договорах</h2>
+      <p data-i="demo_p">Демонстрация с нашим специалистом: развернём, прогоним ваши типовые договоры, обсудим внедрение в ваш контур.</p>
+      <div class="demo-actions">
+        <button class="btn btn-primary" data-i="demo_btn1" onclick="requestDemo()">Запросить демо</button>
+        <button class="btn btn-outline" data-i="demo_btn2" onclick="openSandbox()">Посмотреть sandbox</button>
+      </div>
+      <div class="secondary-link" data-i="demo_sec">Хотите сначала пощупать сами? <a href="#" onclick="openSandbox();return false;">Откройте демо-песочницу →</a></div>
+    </div>
+
+    <div class="disclaimer">
+      <strong data-i="disc_t">О подписи:</strong> <span data-i="disc_p">SignFinder размещает факсимиле (изображение подписи), а не квалифицированную электронную подпись. Применимость факсимиле определяется соглашением сторон и законодательством вашей юрисдикции.</span>
+    </div>
+  </div>
+</section>
+
+
+<!-- SANDBOX demo v0.1 -->
+<section id="sandbox-demo-section" style="background:var(--bg-soft,var(--bg)); padding: 76px 0;">
+  <div class="wrap">
+    <div class="sandbox-demo">
+      <div class="sandbox-demo-header">
+        <div class="sandbox-demo-badge" data-i="demo_badge_sb">Демо-режим · документ предустановлен</div>
+        <h2 data-i="demo_h_sb">Посмотрите как работает SignFinder</h2>
+        <p data-i="demo_sub_sb">Нажмите «Подписать» — увидите реальный результат на демо-договоре</p>
+      </div>
+      <div class="sandbox-layout">
+        <div>
+          <div class="demo-preview-wrap" id="demo-preview-wrap" style="position:relative;">
+            <img id="demo-img-base" src="demo_ru_base.jpg" alt="Demo contract preview" style="display:block;width:100%;">
+            <img id="demo-img-signed" src="demo_ru_signed.jpg" alt="Demo contract signed" style="position:absolute;top:0;left:0;width:100%;opacity:0;transition:opacity 0.6s ease;">
+          </div>
+          <p id="demo-caption-img" data-i="demo_caption_sb" style="text-align:center;font-size:14px;color:var(--muted);margin:10px 0 0;">Исполнитель подписал. Нажмите, чтобы подписать за Клиента.</p>
+        </div>
+        <div class="demo-panel">
+          <div id="demo-initial">
+            <div class="demo-info-card" style="margin-bottom:14px;">
+              <div class="di-label" data-i="demo_party_label">Сторона</div>
+              <div class="di-val">Vertex Group Ltd</div>
+              <div class="di-label" style="margin-top:10px;" data-i="demo_signer_label">Подписант</div>
+              <div class="di-val">А.П. Лебедев / Lebedzeu A.</div>
+            </div>
+            <div>
+              <button class="btn btn-primary" style="width:100%;padding:15px;font-size:17px;font-weight:700;" onclick="runSandboxDemo()" data-i="demo_btn_sb">Подписать за Клиента</button>
+              <div class="demo-note" data-i="demo_note_sb" style="margin-top:8px;">Демо-договор · без регистрации</div>
+            </div>
+          </div>
+          <div class="result-section" id="demo-result">
+            <div class="tl-row">
+              <div class="tl-item"><div class="tl-dot green"></div><span data-i="demo_tl_sign">Места подписи: 2</span></div>
+              <div class="tl-item"><div class="tl-dot yellow"></div><span data-i="demo_tl_review">Ревью: 2 замечания</span></div>
+            </div>
+            <div class="remarks" id="demo-remarks"></div>
+            <a id="demo-dl-link" class="btn btn-primary download-btn" href="demo_ru_signed.pdf" download onclick="onDemoDownload()" data-i="demo_download">⬇ Скачать PDF</a>
+            <div class="uz-box" id="uz-box">
+              <a class="uz-drop" id="uz-drop" href="https://signfinder.app/app/index.html" onclick="onDropzoneCtaClick()" aria-label="Перейти в кабинет SignFinder">
+                <div class="uz-drop-ico">📄</div>
+                <div class="uz-drop-title" data-i="uz_t">Загрузите свой договор</div>
+                <div class="uz-drop-limits" data-i="uz_limits">PDF · до 3 стр. · до 5 МБ · 3 раза в сутки</div>
+              </a>
+              <div class="uz-privacy" data-i="uz_privacy">Документ не сохраняется и удаляется сразу после обработки</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<footer>
+  <div class="wrap">
+    <div class="logo" style="font-size:18px; margin-bottom:8px; justify-content:center;">SignFinder<span class="dot">.</span><span class="badge">Enterprise</span></div>
+    <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;">
+      <span style="color:var(--muted);font-size:14px;font-weight:600;">Contacts:</span>
+      <a href="https://t.me/SingFinder" target="_blank" style="display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:14px;text-decoration:none;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+        @SignFinder
+      </a>
+      <a href="mailto:alexgeorg2507@gmail.com" style="display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:14px;text-decoration:none;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8l10 6 10-6"/></svg>
+        alexgeorg2507@gmail.com
+      </a>
+    </div>
+    <div data-i="footer">© 2026 SignFinder · Локальное развёртывание для бизнеса</div>
+  </div>
+</footer>
+
+<script>
+const I18N = {
+  ru: {
+    nav_cta: "Запросить демо",
+    eyebrow: "Для агентств и юридических отделов",
+    h1: 'Договоры на потоке —<br><span class="hl">под вашим контролем</span>',
+    sub: "SignFinder находит места подписи, проверяет договоры и расставляет факсимиле — десятки документов за минуты. Разворачивается в вашем контуре: данные не покидают периметр.",
+    cta1: "Запросить демо", cta2: "Локальная установка",
+    t1: "Данные в вашем контуре", t2: "Локальная установка", t3: "4 языка + двуязычные", t4: "До 100 договоров за пакет",
+    pil_k: "Безопасность и контроль", pil_t: "Ваши договоры не уходят на сторону",
+    pil_l: "Коммерческие условия, реквизиты, персональные данные — всё остаётся в вашем периметре.",
+    pil1t: "Замкнутый контур", pil1p: "Развёртывание на вашей инфраструктуре. Документы и ключи не покидают периметр компании.",
+    pil2t: "Аудит и контроль", pil2p: "Каждое подписание фиксируется. Оператор проверяет спорные случаи перед отправкой.",
+    pil3t: "Под ваши процессы", pil3p: "Почтовый агент, пакетная обработка, шаблоны под ваши типовые договоры.",
+    dep_t: "Разворачивается в вашем контуре",
+    dep_p: "Не SaaS, куда нужно загружать конфиденциальные договоры. SignFinder ставится на вашем сервере одной командой — в Docker.",
+    dep1: "Данные остаются внутри компании", dep2: "Свой ключ LLM-провайдера — биллинг напрямую",
+    dep3: "Поддержка при внедрении и настройке", dep4: "Обновления по вашему графику",
+    dep_ready: "Готово к работе.",
+    vol_k: "Для кого", vol_t: "Когда договоров много и они однотипные",
+    vol_l: "Поток входящих документов, который сейчас обрабатывается вручную.",
+    v1t: "Аутстафф и аутсорс", v1p: "Десятки SOW, аддендумов и приложений в месяц с разными заказчиками и в разных юрисдикциях.",
+    v2t: "Юридические отделы", v2p: "Входящие договоры на проверку и подпись. Контроль целостности до подписания.",
+    v3t: "Бэк-офис и операции", v3p: "Акты, договоры, приложения на потоке. Пакетная обработка и почтовый агент.",
+    feat_k: "Возможности", feat_t: "Не редактор PDF — конвейер подписания",
+    f1t: "Поиск по смыслу", f1p: "Привязка к тексту договора, а не к координатам. Работает на вариациях одного шаблона.",
+    f2t: "Pre-flight ревью", f2p: "Проверка целостности договора под юрисдикцию: стороны, сроки, расчёты, ответственность.",
+    f3t: "Почтовый агент", f3p: "Автоматическая обработка входящих писем с договорами. Светофор green/yellow/red.",
+    f4t: "Пакетная обработка", f4p: "До 100 договоров за раз. Шаблоны и распознавание похожих документов.",
+    f5t: "Языки и юрисдикции", f5p: "RU, EN, PL, MK. Двуязычные договоры в две колонки. Профили подписантов.",
+    f6t: "API-доступ", f6p: "REST API поверх движка. Интеграция в ваши системы и процессы.",
+    demo_badge_sb: "Демо-режим · документ предустановлен",
+    demo_h_sb: "Посмотрите как работает SignFinder",
+    demo_sub_sb: "Нажмите «Подписать» — увидите реальный результат на демо-договоре",
+    demo_party_label: "Сторона",
+    demo_signer_label: "Подписант",
+    demo_caption_sb: "Исполнитель подписал. Нажмите, чтобы подписать за Клиента.",
+    demo_btn_sb: "Подписать за Клиента",
+    demo_note_sb: "Демо-договор · без регистрации",
+    demo_tl_sign: "Места подписи: 2",
+    demo_tl_review: "Ревью: 2 замечания",
+    demo_download: "⬇ Скачать PDF",
+    dz_soon_t: "Попробуйте на своём договоре",
+    dz_soon_p: "Загрузка своего документа — скоро",
+    uz_t: "Загрузите свой договор",
+    uz_limits: "PDF · до 3 стр. · до 5 МБ · 3 раза в сутки",
+    uz_privacy: "Документ не сохраняется и удаляется сразу после обработки",
+    demo_t: "Покажем на ваших договорах",
+    demo_p: "Демонстрация с нашим специалистом: развернём, прогоним ваши типовые договоры, обсудим внедрение в ваш контур.",
+    demo_btn1: "Запросить демо", demo_btn2: "Посмотреть sandbox",
+    demo_sec: 'Хотите сначала пощупать сами? <a href="#" onclick="openSandbox();return false;">Откройте демо-песочницу →</a>',
+    disc_t: "О подписи:",
+    disc_p: "SignFinder размещает факсимиле (изображение подписи), а не квалифицированную электронную подпись. Применимость факсимиле определяется соглашением сторон и законодательством вашей юрисдикции.",
+    footer: "© 2026 SignFinder · Локальное развёртывание для бизнеса",
+    nav_cloud: "Для частных специалистов →",
+  },
+  en: {
+    nav_cta: "Request demo",
+    eyebrow: "For agencies and legal teams",
+    h1: 'Contracts at scale —<br><span class="hl">under your control</span>',
+    sub: "SignFinder finds signature spots, checks contracts, and places facsimiles — dozens of documents in minutes. Deployed in your perimeter: data never leaves your infrastructure.",
+    cta1: "Request demo", cta2: "Local setup",
+    t1: "Data in your perimeter", t2: "Local setup", t3: "4 languages + bilingual", t4: "Up to 100 contracts per batch",
+    pil_k: "Security and control", pil_t: "Your contracts don't leave your perimeter",
+    pil_l: "Commercial terms, credentials, personal data — everything stays within your infrastructure.",
+    pil1t: "Closed perimeter", pil1p: "Deployed on your infrastructure. Documents and keys never leave the company perimeter.",
+    pil2t: "Audit and control", pil2p: "Every signing is logged. Operator reviews disputed cases before sending.",
+    pil3t: "Fits your processes", pil3p: "Mail agent, batch processing, templates for your standard contracts.",
+    dep_t: "Deployed in your perimeter",
+    dep_p: "Not SaaS where you upload confidential contracts. SignFinder runs on your server with a single command — in Docker.",
+    dep1: "Data stays inside the company", dep2: "Your LLM provider key — billing direct",
+    dep3: "Support during rollout and setup", dep4: "Updates on your schedule",
+    dep_ready: "Ready to go.",
+    vol_k: "Who it's for", vol_t: "When you have many similar contracts",
+    vol_l: "A stream of incoming documents currently processed manually.",
+    v1t: "Staffing & outsourcing", v1p: "Dozens of SOWs, addenda, and annexes per month with different clients across jurisdictions.",
+    v2t: "Legal teams", v2p: "Incoming contracts for review and signing. Integrity check before signing.",
+    v3t: "Back office & operations", v3p: "Acts, contracts, annexes at scale. Batch processing and mail agent.",
+    feat_k: "Features", feat_t: "Not a PDF editor — a signing pipeline",
+    f1t: "Semantic search", f1p: "Anchored to contract text, not coordinates. Works on variations of the same template.",
+    f2t: "Pre-flight review", f2p: "Contract integrity check by jurisdiction: parties, terms, payments, liability.",
+    f3t: "Mail agent", f3p: "Automatic processing of incoming contract emails. Green/yellow/red traffic light.",
+    f4t: "Batch processing", f4p: "Up to 100 contracts at once. Templates and similar-document recognition.",
+    f5t: "Languages & jurisdictions", f5p: "RU, EN, PL, MK. Bilingual two-column contracts. Signer profiles.",
+    f6t: "API access", f6p: "REST API over the engine. Integration into your systems and processes.",
+    demo_badge_sb: "Demo mode · contract is preset",
+    demo_h_sb: "See how SignFinder works",
+    demo_sub_sb: "Click «Sign» — see a real result on a demo contract",
+    demo_party_label: "Party",
+    demo_signer_label: "Signatory",
+    demo_caption_sb: "Contractor has signed. Click to sign for the Customer.",
+    demo_btn_sb: "Sign for Customer",
+    demo_note_sb: "Demo contract · no signup",
+    demo_tl_sign: "Signature spots: 2",
+    demo_tl_review: "Review: 2 remarks",
+    demo_download: "⬇ Download PDF",
+    dz_soon_t: "Try with your own contract",
+    dz_soon_p: "Upload your own document — coming soon",
+    uz_t: "Upload your contract",
+    uz_limits: "PDF · up to 3 pages · up to 5 MB · 3 times per day",
+    uz_privacy: "The document is not stored and is deleted immediately after processing",
+    demo_t: "We'll show it on your contracts",
+    demo_p: "A demo with our specialist: we deploy, run your standard contracts, and discuss rollout in your perimeter.",
+    demo_btn1: "Request demo", demo_btn2: "View sandbox",
+    demo_sec: 'Want to try it yourself first? <a href="#" onclick="openSandbox();return false;">Open the sandbox →</a>',
+    disc_t: "On signatures:",
+    disc_p: "SignFinder places a facsimile (signature image), not a qualified electronic signature. Applicability of a facsimile is determined by agreement of the parties and the law of your jurisdiction.",
+    footer: "© 2026 SignFinder · Self-hosted for business",
+    nav_cloud: "For solo professionals →",
+  }
+};
+function setLang(l) {
+  sessionStorage.setItem('sf_lang', l);
+  document.querySelectorAll(".nav-lang button").forEach(b => b.classList.toggle("active", b.dataset.lang === l));
+  document.querySelectorAll("[data-i]").forEach(el => { const k = el.dataset.i; if (I18N[l][k] !== undefined) el.innerHTML = I18N[l][k]; });
+  document.documentElement.lang = l;
+  document.querySelectorAll("iframe").forEach(fr => {
+    const want = "hero.html?lang=" + l;
+    if (!fr.src.endsWith(want)) fr.src = want;
+  });
+  // Reset sandbox demo images and state on lang switch
+  const baseImg = document.getElementById('demo-img-base');
+  const signedImg = document.getElementById('demo-img-signed');
+  if (baseImg) {
+    baseImg.src = l === 'ru' ? 'demo_ru_base.jpg' : 'demo_en_base.jpg';
+    signedImg.src = l === 'ru' ? 'demo_ru_signed.jpg' : 'demo_en_signed.jpg';
+    signedImg.style.opacity = '0';
+    const di = document.getElementById('demo-initial');
+    const dr = document.getElementById('demo-result');
+    if (di) di.style.display = '';
+    if (dr) dr.classList.remove('active');
+  }
+  if (window.posthog) posthog.capture('lang_switch', {lang: l, page: 'enterprise'});
+}
+function requestDemo() {
+  const lang = document.documentElement.lang || 'ru';
+  const msg = lang === 'en'
+    ? 'Hi! I would like a SignFinder Enterprise demo 🙂'
+    : 'Добрый день! Хотим демо SignFinder для бизнеса 🙂';
+  try { navigator.clipboard.writeText(msg); } catch(e) {}
+  if (window.posthog) posthog.capture('cta_click', {button: 'demo_telegram', page: 'enterprise', lang});
+  window.open('https://t.me/SingFinder', '_blank');
+}
+function scrollToDemo() { document.getElementById('demo-section').scrollIntoView({ behavior: 'smooth' }); }
+function openSandbox() {
+  const lang = document.documentElement.lang || 'ru';
+  if (window.posthog) posthog.capture('cta_click', {button: 'sandbox', page: 'enterprise', lang});
+  document.getElementById('sandbox-demo-section').scrollIntoView({ behavior: 'smooth' });
+}
+const _pathLang = location.pathname.startsWith('/en') ? 'en' : location.pathname.startsWith('/ru') ? 'ru' : null; const _autoLang = _pathLang || sessionStorage.getItem('sf_lang') || ((navigator.language || 'ru').startsWith('ru') ? 'ru' : 'en');
+setLang(_autoLang);
+if (window.posthog) posthog.capture('$pageview', {page: 'enterprise', lang: _autoLang});
+
+const DEMO_RESULT_RU = {"traffic_light":"green","anchors_count":2,"review":{"traffic_light":"yellow","remarks":[{"severity":"warning","text":"Срок действия договора не указан явно (п. 7.1)"},{"severity":"ok","text":"Стороны идентифицированы"},{"severity":"warning","text":"Проверьте порядок расчётов (раздел 5)"}]}};
+const DEMO_RESULT_EN = {"traffic_light":"green","anchors_count":2,"review":{"traffic_light":"yellow","remarks":[{"severity":"warning","text":"Contract term not explicitly stated (cl. 7.1)"},{"severity":"ok","text":"Parties identified"},{"severity":"warning","text":"Check payment schedule (section 5)"}]}};
+
+function runSandboxDemo() {
+  const lang = document.documentElement.lang || 'ru';
+  if (window.posthog) posthog.capture('sandbox_demo_click', {page: 'enterprise', lang});
+
+  // Fade-in signed image over base
+  document.getElementById('demo-img-signed').style.opacity = '1';
+
+  // Update download link to correct signed PDF
+  const dlLink = document.getElementById('demo-dl-link');
+  if (dlLink) dlLink.href = lang === 'en' ? 'demo_en_signed.pdf' : 'demo_ru_signed.pdf';
+
+  // Switch panel: hide sign button, show result
+  document.getElementById('demo-initial').style.display = 'none';
+  const result = document.getElementById('demo-result');
+  result.classList.add('active');
+  const data = lang === 'en' ? DEMO_RESULT_EN : DEMO_RESULT_RU;
+  const remarksEl = document.getElementById('demo-remarks');
+  remarksEl.innerHTML = '';
+  data.review.remarks.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'remark-card';
+    card.innerHTML = '<div class="remark-bar ' + r.severity + '"></div><div>' + r.text + '</div>';
+    remarksEl.appendChild(card);
+  });
+}
+function onDemoDownload() {
+  const lang = document.documentElement.lang || 'ru';
+  if (window.posthog) posthog.capture('sandbox_demo_download', {page: 'enterprise', lang});
+}
+
+function onDropzoneCtaClick() {
+  if (window.posthog) posthog.capture('cta_click', {button: 'dropzone_to_app'});
+}
+</script>
+</body>
+</html>
+
+
+
