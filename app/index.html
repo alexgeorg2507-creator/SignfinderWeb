@@ -103,6 +103,19 @@
   .party-row   { display: flex; align-items: center; gap: 0.5rem; font-size: 13px; padding: 0.3rem 0; }
   .party-badge { font-size: 11px; background: var(--c-accent-bg); color: var(--c-accent); border-radius: 4px; padding: 0.15rem 0.4rem; }
 
+  /* ── work tab: PDF preview ── */
+  .work-layout { display: grid; grid-template-columns: 1fr 380px; gap: 1.5rem; }
+  @media (max-width: 900px) { .work-layout { grid-template-columns: 1fr; } }
+  .pdf-preview-panel { background: var(--c-surface); border: 1px solid var(--c-border);
+    border-radius: 14px; overflow: hidden; min-height: 480px;
+    display: flex; flex-direction: column; }
+  .pdf-preview-toolbar { padding: 0.5rem 1rem; font-size: 12px; color: var(--c-muted);
+    border-bottom: 1px solid var(--c-border); display: flex;
+    align-items: center; justify-content: space-between; }
+  .pdf-preview-iframe { flex: 1; border: none; width: 100%; min-height: 440px; }
+  .pdf-preview-empty { flex: 1; display: flex; align-items: center; justify-content: center;
+    color: var(--c-muted); font-size: 13px; padding: 2rem; text-align: center; }
+
   /* ── responsive ── */
   @media (max-width: 600px) {
     .sidebar { display: none; }
@@ -166,7 +179,6 @@
   <div class="topbar">
     <div class="topbar-logo">
       SignFinder
-      <span id="app-version-badge" style="font-size:11px;font-weight:400;color:var(--c-muted);margin-left:6px"></span>
     </div>
     <div class="topbar-user">
       <span id="topbar-email"></span>
@@ -233,10 +245,8 @@ const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
-// Version badge — injected by CI, fallback to 'dev'
+// Version — injected by CI, fallback to 'dev'. Shown only in profile footer.
 const _sfVersion = (typeof window.__SF_VERSION__ !== 'undefined') ? window.__SF_VERSION__ : 'dev';
-const _vBadge = document.getElementById('app-version-badge');
-if (_vBadge) _vBadge.textContent = 'v' + _sfVersion;
 
 // ── State ──────────────────────────────────────────────────────────────────
 let currentUser = null;
@@ -350,41 +360,57 @@ const TABS = {
     <div class="section-title">Подписать договор</div>
     <div class="section-sub">Загрузите PDF — найдём место и проставим вашу подпись</div>
 
-    <div class="card" style="padding:1rem 1.5rem">
-      <div class="usage-row">
-        <span>Документы в этом месяце</span>
-        <span id="work-usage-label" style="font-weight:600">—</span>
+    <div class="work-layout">
+      <div>
+        <div class="card" style="padding:1rem 1.5rem">
+          <div class="usage-row">
+            <span>Документы в этом месяце</span>
+            <span id="work-usage-label" style="font-weight:600">—</span>
+          </div>
+          <div class="usage-bar-bg">
+            <div class="usage-bar-fill" id="work-usage-fill" style="width:0%;background:var(--c-success)"></div>
+          </div>
+        </div>
+
+        <div class="privacy-note">
+          <span>🔒</span>
+          <span>Документ не сохраняется. Обрабатывается в памяти Cloud Run и удаляется сразу после возврата подписанного PDF.</span>
+        </div>
+
+        <div class="card" id="work-upload-card">
+          <div id="work-msg" class="msg"></div>
+          <label class="upload-label" id="work-dropzone">
+            📄 Перетащите PDF или нажмите для выбора
+            <input type="file" id="work-file" accept=".pdf,.doc,.docx" style="display:none">
+          </label>
+          <div class="hint" style="margin-top:0.5rem">PDF, DOC, DOCX · до 5 МБ · до 10 страниц</div>
+        </div>
+
+        <div id="work-spinner" style="display:none" class="card">
+          <div style="text-align:center;color:var(--c-muted);font-size:14px;padding:1rem 0">
+            <span id="work-spinner-text">⏳ Анализируем документ...</span>
+          </div>
+        </div>
+
+        <div id="work-result-card" style="display:none" class="card">
+          <div id="work-traffic-light"></div>
+          <div id="work-parties"></div>
+          <div id="work-anchor-info" style="font-size:14px;color:var(--c-muted);margin-bottom:1rem"></div>
+          <div id="work-sign-area"></div>
+        </div>
       </div>
-      <div class="usage-bar-bg">
-        <div class="usage-bar-fill" id="work-usage-fill" style="width:0%;background:var(--c-success)"></div>
+
+      <div class="pdf-preview-panel" id="pdf-preview-panel">
+        <div class="pdf-preview-toolbar" id="pdf-preview-toolbar" style="display:none">
+          <span id="pdf-preview-label">Предпросмотр</span>
+          <span id="pdf-preview-pages"></span>
+        </div>
+        <iframe class="pdf-preview-iframe" id="pdf-preview-iframe"
+          style="display:none"></iframe>
+        <div class="pdf-preview-empty" id="pdf-preview-empty">
+          📄 Здесь появится<br>предпросмотр документа
+        </div>
       </div>
-    </div>
-
-    <div class="privacy-note">
-      <span>🔒</span>
-      <span>Документ не сохраняется. Обрабатывается в памяти Cloud Run и удаляется сразу после возврата подписанного PDF.</span>
-    </div>
-
-    <div class="card" id="work-upload-card">
-      <div id="work-msg" class="msg"></div>
-      <label class="upload-label" id="work-dropzone">
-        📄 Перетащите PDF или нажмите для выбора
-        <input type="file" id="work-file" accept=".pdf" style="display:none">
-      </label>
-      <div class="hint" style="margin-top:0.5rem">PDF · до 5 МБ · до 3 страниц</div>
-    </div>
-
-    <div id="work-spinner" style="display:none" class="card">
-      <div style="text-align:center;color:var(--c-muted);font-size:14px;padding:1rem 0">
-        <span id="work-spinner-text">⏳ Анализируем документ...</span>
-      </div>
-    </div>
-
-    <div id="work-result-card" style="display:none" class="card">
-      <div id="work-traffic-light"></div>
-      <div id="work-parties"></div>
-      <div id="work-anchor-info" style="font-size:14px;color:var(--c-muted);margin-bottom:1rem"></div>
-      <div id="work-sign-area"></div>
     </div>`,
 };
 
@@ -692,9 +718,49 @@ async function loadWorkUsage() {
   }
 }
 
+// ── PDF preview panel ─────────────────────────────────────────────────────
+function showPdfPreview(pdfBlob, pageNumber, label) {
+  const iframe = document.getElementById('pdf-preview-iframe');
+  const empty  = document.getElementById('pdf-preview-empty');
+  const toolbar = document.getElementById('pdf-preview-toolbar');
+  const lbl    = document.getElementById('pdf-preview-label');
+  if (!iframe) return;
+
+  // Revoke previous blob URL
+  if (iframe._blobUrl) URL.revokeObjectURL(iframe._blobUrl);
+
+  const url = URL.createObjectURL(pdfBlob);
+  iframe._blobUrl = url;
+  // Open on specific page using PDF fragment identifier
+  iframe.src = url + (pageNumber > 1 ? '#page=' + pageNumber : '');
+  iframe.style.display = 'block';
+  empty.style.display = 'none';
+  toolbar.style.display = 'flex';
+  lbl.textContent = label || 'Предпросмотр';
+}
+
+function resetPdfPreview(emptyMessage) {
+  const iframe = document.getElementById('pdf-preview-iframe');
+  const empty  = document.getElementById('pdf-preview-empty');
+  const toolbar = document.getElementById('pdf-preview-toolbar');
+  if (iframe) {
+    if (iframe._blobUrl) URL.revokeObjectURL(iframe._blobUrl);
+    iframe._blobUrl = null;
+    iframe.src = '';
+    iframe.style.display = 'none';
+  }
+  if (empty) {
+    empty.innerHTML = emptyMessage || '📄 Здесь появится<br>предпросмотр документа';
+    empty.style.display = 'flex';
+  }
+  if (toolbar) toolbar.style.display = 'none';
+}
+
 async function handleWorkFile(file) {
-  if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
-    return showWorkMsg("Только PDF файлы", "error");
+  const lowerName = file.name.toLowerCase();
+  const allowedExt = [".pdf", ".doc", ".docx"];
+  if (!allowedExt.some(ext => lowerName.endsWith(ext))) {
+    return showWorkMsg("Только PDF, DOC, DOCX файлы", "error");
   }
   if (file.size > 5 * 1024 * 1024) {
     return showWorkMsg("Файл слишком большой (макс 5 МБ)", "error");
@@ -703,6 +769,13 @@ async function handleWorkFile(file) {
   document.getElementById("work-result-card").style.display = "none";
   showWorkMsg("", "");
   showWorkSpinner("Анализируем документ...");
+
+  // Preview original — only PDF renders inline; DOC/DOCX shows a hint instead
+  if (lowerName.endsWith(".pdf") || file.type === "application/pdf") {
+    showPdfPreview(file, 1, "Исходный документ");
+  } else {
+    resetPdfPreview("📄 Предпросмотр DOC/DOCX недоступен.<br>Документ будет сконвертирован в PDF при подписании.");
+  }
 
   const fd = new FormData();
   fd.append("file", file);
@@ -824,12 +897,20 @@ window.workSign = async () => {
 
   // Trigger download
   const blob = await res.blob();
+  const baseName = _workFile.name.includes(".") ? _workFile.name.replace(/\.[^.]+$/, "") : _workFile.name;
+  const downloadName = "signed_" + baseName + ".pdf";
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = "signed_" + _workFile.name;
+  a.href = url; a.download = downloadName;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
   if (window.posthog) posthog.capture("document_signed");
+
+  // Preview signed PDF, opened on the first page containing a signature
+  const firstSignedPage = (_workAnchors && _workAnchors.length > 0)
+    ? (parseInt(_workAnchors[0].page_hint || "0", 10) + 1)  // page_hint is 0-indexed
+    : 1;
+  showPdfPreview(blob, firstSignedPage, "Подписанный документ");
 
   // Reset button for re-use
   if (btn) {
@@ -839,6 +920,7 @@ window.workSign = async () => {
       _workFile = null; _workAnchors = null;
       document.getElementById("work-result-card").style.display = "none";
       showWorkMsg("", "");
+      resetPdfPreview();
       // Reset file input
       const fi = document.getElementById("work-file");
       if (fi) fi.value = "";
