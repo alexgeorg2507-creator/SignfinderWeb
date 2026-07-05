@@ -105,19 +105,20 @@
   .party-badge { font-size: 11px; background: var(--c-accent-bg); color: var(--c-accent); border-radius: 4px; padding: 0.15rem 0.4rem; }
 
   /* ── work tab: PDF preview ── */
-  .work-layout { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+  .work-layout { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
   @media (max-width: 900px) {
     .work-layout { grid-template-columns: 1fr; }
     .pdf-preview-panel { position: static; height: 60vw; min-height: 300px; }
   }
-  .pdf-preview-panel { background: var(--c-surface); border: 1px solid var(--c-border);
-    border-radius: 14px; overflow: hidden; min-height: 480px; max-height: 900px;
+  .pdf-preview-panel { background: #fff; border: 1px solid var(--c-border);
+    border-radius: 10px; overflow: hidden; min-height: 500px;
     display: flex; flex-direction: column; position: sticky; top: 1rem;
-    height: calc(100vh - 80px); }
-  .pdf-preview-toolbar { padding: 0.5rem 1rem; font-size: 12px; color: var(--c-muted);
+    height: calc(100vh - 90px); }
+  .pdf-preview-toolbar { padding: 0.4rem 0.75rem; font-size: 12px; color: var(--c-muted);
     border-bottom: 1px solid var(--c-border); display: flex;
-    align-items: center; justify-content: space-between; }
-  .pdf-preview-iframe { flex: 1; border: none; width: 100%; height: 100%; }
+    align-items: center; justify-content: space-between;
+    background: var(--c-surface); flex-shrink: 0; }
+  .pdf-preview-iframe { flex: 1; border: none; width: 100%; height: 100%; background: #fff; display: block; }
   .pdf-preview-empty { flex: 1; display: flex; align-items: center; justify-content: center;
     color: var(--c-muted); font-size: 13px; padding: 2rem; text-align: center; }
   .preview-actions { display: flex; gap: 0.5rem; }
@@ -203,9 +204,6 @@
       <div class="nav-item active" onclick="showTab('profile')" id="nav-profile">
         <span class="nav-icon">👤</span> Профиль
       </div>
-      <div class="nav-item" onclick="showTab('signature')" id="nav-signature">
-        <span class="nav-icon">✍️</span> Подпись
-      </div>
       <div class="nav-item" onclick="showTab('work')" id="nav-work">
         <span class="nav-icon">📄</span> Подписать договор
       </div>
@@ -220,9 +218,6 @@
   <div class="mobile-nav">
     <div class="mobile-nav-item active" onclick="showTab('profile')" id="mnav-profile">
       <span class="mobile-nav-icon">👤</span>Профиль
-    </div>
-    <div class="mobile-nav-item" onclick="showTab('signature')" id="mnav-signature">
-      <span class="mobile-nav-icon">✍️</span>Подпись
     </div>
     <div class="mobile-nav-item" onclick="showTab('work')" id="mnav-work">
       <span class="mobile-nav-icon">📄</span>Договор
@@ -313,10 +308,38 @@ const TABS = {
       <input class="input" id="pf-name" placeholder="ФИО">
       <input class="input" id="pf-company" placeholder="Компания">
       <textarea class="input" id="pf-req" rows="3" placeholder="Реквизиты (ИНН, адрес, ...)" style="resize:vertical"></textarea>
-      <div style="font-size:12px;color:var(--c-muted);margin-bottom:0.75rem;margin-top:0.25rem">Название и роль в договоре — по ним система находит место подписи</div>
-      <input class="input" id="pt-name" placeholder="Название в договоре (точно как написано)">
-      <input class="input" id="pt-role" placeholder="Роль: ПРОДАВЕЦ, ЗАКАЗЧИК, ИСПОЛНИТЕЛЬ...">
       <button class="btn btn-primary" onclick="saveProfile()">Сохранить</button>
+    </div>
+    <div class="card">
+      <div style="font-size:15px;font-weight:600;margin-bottom:0.25rem">Подпись</div>
+      <div style="font-size:13px;color:var(--c-muted);margin-bottom:1rem">Будет проставляться на договоры автоматически</div>
+      <div id="sig-msg" class="msg"></div>
+      <div id="sig-current"></div>
+      <label class="upload-label">
+        📷 Загрузить или сфотографировать
+        <input type="file" id="sig-file" accept="image/*" capture="environment" style="display:none">
+      </label>
+      <div class="hint" style="margin-top:0.5rem">
+        На телефоне открывает камеру. На десктопе — выбор файла.<br>
+        Подпись на белом листе, хорошее освещение.
+      </div>
+      <div id="sig-processing" style="display:none;text-align:center;color:var(--c-muted);font-size:14px;padding:0.5rem 0">
+        ⏳ Обработка...
+      </div>
+      <div id="sig-preview" style="display:none;margin-top:1rem">
+        <div class="sig-grid">
+          <div class="sig-col">
+            <div class="sig-col-label">Оригинал</div>
+            <img id="sig-original" class="sig-img">
+          </div>
+          <div class="sig-col">
+            <div class="sig-col-label">После обработки (прозрачный фон)</div>
+            <img id="sig-processed" class="sig-img sig-img-processed">
+          </div>
+        </div>
+        <div id="sig-meta" class="sig-meta"></div>
+        <button class="btn btn-primary" onclick="saveSignature()" id="btn-save-sig">Сохранить подпись</button>
+      </div>
     </div>
     <div id="profile-version-footer" style="margin-top:2rem;text-align:center;font-size:11px;color:var(--c-muted)"></div>`,
 
@@ -444,8 +467,7 @@ window.showTab = (tab) => {
   const mainEl = document.getElementById("main-content");
   mainEl.innerHTML = TABS[tab] || "";
   mainEl.classList.toggle("wide", tab === "work");
-  if (tab === "profile")   { loadProfile(); }
-  if (tab === "signature") { initSignatureTab(); }
+  if (tab === "profile")   { loadProfile(); initSignatureTab(); }
   if (tab === "party")     { loadParty(); }
   if (tab === "work")      { initWorkTab(); }
 };
@@ -490,15 +512,6 @@ async function loadProfile() {
   if (n) n.value = data.full_name || "";
   if (c) c.value = data.company || "";
   if (r) r.value = data.requisites || "";
-  // also load party
-  const rp = await apiFetch("/v1/me/party");
-  if (rp.ok) {
-    const pd = await rp.json();
-    const pn = document.getElementById("pt-name");
-    const pr = document.getElementById("pt-role");
-    if (pn) pn.value = pd.name || "";
-    if (pr) pr.value = pd.role || "";
-  }
 }
 
 window.saveProfile = async () => {
@@ -507,15 +520,8 @@ window.saveProfile = async () => {
     company:   document.getElementById("pf-company").value.trim(),
     requisites:document.getElementById("pf-req").value.trim(),
   };
-  const partyBody = {
-    name: (document.getElementById("pt-name") || {}).value?.trim() || "",
-    role: (document.getElementById("pt-role") || {}).value?.trim() || "",
-  };
-  const [res, rp] = await Promise.all([
-    apiFetch("/v1/me/profile", { method: "PUT", body: JSON.stringify(body) }),
-    apiFetch("/v1/me/party",   { method: "PUT", body: JSON.stringify(partyBody) }),
-  ]);
-  const ok = res.ok && rp.ok;
+  const res = await apiFetch("/v1/me/profile", { method: "PUT", body: JSON.stringify(body) });
+  const ok = res.ok;
   showTabMsg("profile-msg", ok ? "Сохранено" : "Ошибка сохранения", ok ? "success" : "error");
   if (ok && window.posthog) posthog.capture("profile_filled");
 };
