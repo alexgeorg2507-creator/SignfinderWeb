@@ -104,7 +104,7 @@
   .party-badge { font-size: 11px; background: var(--c-accent-bg); color: var(--c-accent); border-radius: 4px; padding: 0.15rem 0.4rem; }
 
   /* ── work tab: PDF preview ── */
-  .work-layout { display: grid; grid-template-columns: 1fr 380px; gap: 1.5rem; }
+  .work-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 1.5rem; }
   @media (max-width: 900px) { .work-layout { grid-template-columns: 1fr; } }
   .pdf-preview-panel { background: var(--c-surface); border: 1px solid var(--c-border);
     border-radius: 14px; overflow: hidden; min-height: 480px;
