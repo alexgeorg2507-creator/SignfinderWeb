@@ -304,12 +304,12 @@ window.showScreen = (name) => {
 const TABS = {
   profile: `
     <div class="section-title">Профиль</div>
-    <div class="section-sub">Ваши данные, которые подставляются в договоры</div>
+    <div class="section-sub">Ваши данные, по которым я ищу место подписи</div>
     <div class="card" id="profile-card">
       <div id="profile-msg" class="msg"></div>
-      <input class="input" id="pf-name" placeholder="ФИО">
-      <input class="input" id="pf-company" placeholder="Компания">
-      <button class="btn btn-primary" onclick="saveProfile()">Сохранить</button>
+      <input class="input" id="pf-name" placeholder="ФИО подписанта для поиска подписи">
+      <input class="input" id="pf-company" placeholder="Именование компании в договоре (для юрлиц)">
+      <div class="hint" style="margin-top:0.25rem">Данные сохраняются автоматически</div>
     </div>
     <div class="card">
       <div style="font-size:15px;font-weight:600;margin-bottom:0.25rem">Подпись</div>
@@ -510,6 +510,16 @@ async function loadProfile() {
   const c = document.getElementById("pf-company");
   if (n) n.value = data.full_name || "";
   if (c) c.value = data.company || "";
+  _initProfileAutosave();
+}
+
+function _initProfileAutosave() {
+  ['pf-name', 'pf-company'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el._autosaveAttached) return;
+    el._autosaveAttached = true;
+    el.addEventListener('blur', () => saveProfile());
+  });
 }
 
 window.saveProfile = async () => {
@@ -797,7 +807,7 @@ function showPdfPreview(pdfBlob, pageNumber, label) {
   const url = URL.createObjectURL(pdfBlob);
   iframe._blobUrl = url;
   // Open on specific page using PDF fragment identifier
-  iframe.src = url + (pageNumber > 1 ? '#page=' + pageNumber : '');
+  iframe.src = url + '#toolbar=0&navpanes=0' + (pageNumber > 1 ? '&page=' + pageNumber : '');
   iframe.style.display = 'block';
   empty.style.display = 'none';
   toolbar.style.display = 'flex';
