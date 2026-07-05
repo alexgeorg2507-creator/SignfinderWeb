@@ -66,7 +66,7 @@
   .nav-item.active { color: var(--c-accent); border-left-color: var(--c-accent); background: var(--c-accent-bg); }
   .nav-icon { font-size: 18px; width: 20px; text-align: center; }
   .main-content { flex: 1; padding: 2rem 1.5rem; max-width: 720px; overflow-y: auto; }
-  .main-content.wide { max-width: 900px; }
+  .main-content.wide { max-width: 1100px; }
   .section-title { font-size: 20px; font-weight: 600; margin-bottom: 0.25rem; }
   .section-sub { color: var(--c-muted); font-size: 14px; margin-bottom: 1.5rem; }
   .card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem; }
@@ -105,17 +105,27 @@
   .party-badge { font-size: 11px; background: var(--c-accent-bg); color: var(--c-accent); border-radius: 4px; padding: 0.15rem 0.4rem; }
 
   /* ── work tab: PDF preview ── */
-  .work-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 1.5rem; }
-  @media (max-width: 900px) { .work-layout { grid-template-columns: 1fr; } }
+  .work-layout { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+  @media (max-width: 900px) {
+    .work-layout { grid-template-columns: 1fr; }
+    .pdf-preview-panel { position: static; height: 60vw; min-height: 300px; }
+  }
   .pdf-preview-panel { background: var(--c-surface); border: 1px solid var(--c-border);
-    border-radius: 14px; overflow: hidden; min-height: 480px;
-    display: flex; flex-direction: column; }
+    border-radius: 14px; overflow: hidden; min-height: 480px; max-height: 900px;
+    display: flex; flex-direction: column; position: sticky; top: 1rem;
+    height: calc(100vh - 80px); }
   .pdf-preview-toolbar { padding: 0.5rem 1rem; font-size: 12px; color: var(--c-muted);
     border-bottom: 1px solid var(--c-border); display: flex;
     align-items: center; justify-content: space-between; }
-  .pdf-preview-iframe { flex: 1; border: none; width: 100%; min-height: 440px; }
+  .pdf-preview-iframe { flex: 1; border: none; width: 100%; height: 100%; }
   .pdf-preview-empty { flex: 1; display: flex; align-items: center; justify-content: center;
     color: var(--c-muted); font-size: 13px; padding: 2rem; text-align: center; }
+  .preview-actions { display: flex; gap: 0.5rem; }
+  .preview-actions button { font-size: 12px; padding: 0.3rem 0.65rem;
+    border: 1px solid var(--c-border); border-radius: 8px;
+    background: var(--c-surface); cursor: pointer; font-family: inherit;
+    color: var(--c-text); transition: background .15s; }
+  .preview-actions button:hover { background: var(--c-bg); }
 
   /* ── responsive ── */
   @media (max-width: 600px) {
@@ -129,6 +139,7 @@
   .mobile-nav-icon { font-size: 20px; }
   @media (max-width: 600px) { .main-content { padding-bottom: 5rem; } }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 </head>
 <body>
 
@@ -257,6 +268,10 @@ let _workFile = null;
 let _workAnchors = null;
 let _workPartyTemplate = null;
 let _signupCompletedFired = false;
+let _cachedVersionStr = null;
+let _workSigReady = false;
+let _signedBlob = null;
+let _signedFilename = null;
 
 async function refreshToken() {
   if (!currentUser) return null;
@@ -358,8 +373,7 @@ const TABS = {
     </div>`,
 
   work: `
-    <div class="section-title">Подписать договор</div>
-    <div class="section-sub">Загрузите PDF — найдём место и проставим вашу подпись</div>
+    <div class="section-sub" style="margin-bottom:1rem">Загрузите документ (PDF, DOCX) — найдём места подписания и проставим вашу подпись</div>
 
     <div class="work-layout">
       <div>
@@ -375,7 +389,7 @@ const TABS = {
 
         <div class="privacy-note">
           <span>🔒</span>
-          <span>Документ не сохраняется. Обрабатывается в памяти Cloud Run и удаляется сразу после возврата подписанного PDF.</span>
+          <span>Документ не сохраняется в облаке. Обрабатывается в памяти и удаляется сразу после окончания сессии</span>
         </div>
 
         <div class="card" id="work-upload-card">
@@ -404,7 +418,10 @@ const TABS = {
       <div class="pdf-preview-panel" id="pdf-preview-panel">
         <div class="pdf-preview-toolbar" id="pdf-preview-toolbar" style="display:none">
           <span id="pdf-preview-label">Предпросмотр</span>
-          <span id="pdf-preview-pages"></span>
+          <div class="preview-actions" id="preview-actions" style="display:none">
+            <button onclick="downloadSignedPdf()" title="Скачать">⬇️ Скачать</button>
+            <button onclick="shareSignedPdf()" title="Поделиться" id="btn-share">↗️ Поделиться</button>
+          </div>
         </div>
         <iframe class="pdf-preview-iframe" id="pdf-preview-iframe"
           style="display:none"></iframe>
@@ -418,6 +435,7 @@ const TABS = {
 window.showTab = (tab) => {
   _processedSigB64 = null;
   _workFile = null; _workAnchors = null;
+  _signedBlob = null; _signedFilename = null;
   document.querySelectorAll(".nav-item, .mobile-nav-item").forEach(el => el.classList.remove("active"));
   const navEl = document.getElementById("nav-" + tab);
   const mnavEl = document.getElementById("mnav-" + tab);
@@ -443,17 +461,23 @@ async function apiFetch(path, opts = {}) {
 }
 
 // ── Profile ────────────────────────────────────────────────────────────────
-async function loadProfile() {
+function _updateVersionFooter() {
   const footer = document.getElementById("profile-version-footer");
-  if (footer) {
-    const webV = (typeof window.__SF_VERSION__ !== 'undefined') ? window.__SF_VERSION__ : 'dev';
-    footer.textContent = `Web v${webV}`;
-    // fetch API version async, update when ready
+  if (!footer) return;
+  const webV = (typeof window.__SF_VERSION__ !== 'undefined') ? window.__SF_VERSION__ : 'dev';
+  footer.textContent = _cachedVersionStr
+    ? `Web v${webV} \u00b7 ${_cachedVersionStr}`
+    : `Web v${webV}`;
+}
+
+async function loadProfile() {
+  _updateVersionFooter();
+  if (!_cachedVersionStr) {
     apiFetch("/v1/version").then(r => r.ok ? r.json() : null).then(d => {
-      if (d && footer) {
+      if (d) {
         const apiVer = d.api_build ? `${d.api_version}.${d.api_build}` : (d.api_version || '?');
-        const coreVer = d.signfinder_core_version || '?';
-        footer.textContent = `Web v${webV} \u00b7 API v${apiVer} \u00b7 Core v${coreVer}`;
+        _cachedVersionStr = `API v${apiVer} \u00b7 Core v${d.signfinder_core_version || '?'}`;
+        _updateVersionFooter();
       }
     }).catch(() => {});
   }
@@ -681,9 +705,14 @@ window.checkVerified = async () => {
 // ── Work tab ───────────────────────────────────────────────────────────────
 async function initWorkTab() {
   loadWorkUsage();
-  // Pre-load party template for "our side" hint
-  const res = await apiFetch("/v1/me/party");
-  if (res.ok) _workPartyTemplate = await res.json();
+  _workSigReady = false;
+  // Pre-load party template and signature readiness in parallel
+  const [partyRes, sigRes] = await Promise.all([
+    apiFetch("/v1/me/party"),
+    apiFetch("/v1/me/signature"),
+  ]);
+  if (partyRes.ok) _workPartyTemplate = await partyRes.json();
+  _workSigReady = sigRes.ok;
 
   const fileInput = document.getElementById("work-file");
   if (fileInput) fileInput.addEventListener("change", e => {
@@ -757,6 +786,34 @@ function resetPdfPreview(emptyMessage) {
     empty.style.display = 'flex';
   }
   if (toolbar) toolbar.style.display = 'none';
+  const actions = document.getElementById('preview-actions');
+  if (actions) actions.style.display = 'none';
+}
+
+async function showDocxPreview(file) {
+  if (typeof mammoth === 'undefined') {
+    resetPdfPreview('📄 Предпросмотр DOC/DOCX недоступен.');
+    return;
+  }
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+    const styledHtml = `<!DOCTYPE html><html><head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: -apple-system, 'Segoe UI', sans-serif;
+               font-size: 14px; line-height: 1.6; padding: 1.5rem;
+               color: #1a1a18; max-width: 100%; }
+        p { margin: 0 0 0.75rem; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
+        td, th { border: 1px solid #ccc; padding: 4px 8px; }
+      </style>
+      </head><body>${html}</body></html>`;
+    const blob = new Blob([styledHtml], { type: 'text/html' });
+    showPdfPreview(blob, 1, 'Предпросмотр документа');
+  } catch {
+    resetPdfPreview('📄 Не удалось отобразить DOC/DOCX.');
+  }
 }
 
 async function handleWorkFile(file) {
@@ -769,16 +826,21 @@ async function handleWorkFile(file) {
     return showWorkMsg("Файл слишком большой (макс 5 МБ)", "error");
   }
   _workFile = file; _workAnchors = null;
+  _signedBlob = null; _signedFilename = null;
+  const actionsEl = document.getElementById('preview-actions');
+  if (actionsEl) actionsEl.style.display = 'none';
   document.getElementById("work-result-card").style.display = "none";
   showWorkMsg("", "");
-  showWorkSpinner("Анализируем документ...");
 
-  // Preview original — only PDF renders inline; DOC/DOCX shows a hint instead
-  if (lowerName.endsWith(".pdf") || file.type === "application/pdf") {
-    showPdfPreview(file, 1, "Исходный документ");
+  // Show preview immediately — DOCX via mammoth.js, PDF inline
+  const isDocx = /\.(doc|docx)$/i.test(file.name);
+  if (isDocx) {
+    showDocxPreview(file);
   } else {
-    resetPdfPreview("📄 Предпросмотр DOC/DOCX недоступен.<br>Документ будет сконвертирован в PDF при подписании.");
+    showPdfPreview(file, 1, "Исходный документ");
   }
+
+  showWorkSpinner("Анализируем документ...");
 
   const fd = new FormData();
   fd.append("file", file);
@@ -805,6 +867,20 @@ async function handleWorkFile(file) {
   const result = await res.json();
   _workAnchors = result.anchors || [];
   renderAnalysisResult(result);
+
+  const n = _workAnchors.length;
+  const signArea = document.getElementById("work-sign-area");
+  if (n > 0 && _workSigReady) {
+    showWorkSpinner("Подписываем...");
+    await workSign();
+    hideWorkSpinner();
+  } else if (n > 0 && !_workSigReady) {
+    if (signArea) signArea.innerHTML = `
+      <div class="msg info" style="display:block; margin-top:0.5rem">
+        ✏️ Найдено ${n} ${n === 1 ? 'место' : 'места/мест'} для подписи.
+        Подпись не загружена — перейдите в раздел <strong>Подпись</strong> для загрузки.
+      </div>`;
+  }
 }
 
 function renderAnalysisResult(result) {
@@ -860,19 +936,17 @@ function renderAnalysisResult(result) {
     n > 0 ? `Мест для подписи: ${n}` : "Мест для подписи не найдено.";
 
   const signArea = document.getElementById("work-sign-area");
-  if (n > 0) {
-    signArea.innerHTML = `<button class="btn btn-primary" id="btn-work-sign" onclick="workSign()">Подписать и скачать</button>`;
-  } else {
+  if (n === 0) {
     signArea.innerHTML = `<p style="font-size:13px;color:var(--c-muted)">Попробуйте другой документ или шаблон подписи.</p>`;
+  } else {
+    signArea.innerHTML = '';
   }
 
   if (result.error) showWorkMsg(result.error, "info");
 }
 
-window.workSign = async () => {
+async function workSign() {
   if (!_workFile || !_workAnchors || !_workAnchors.length) return;
-  const btn = document.getElementById("btn-work-sign");
-  if (btn) { btn.disabled = true; btn.textContent = "Подписываем..."; }
   showWorkMsg("", "");
 
   const fd = new FormData();
@@ -881,55 +955,61 @@ window.workSign = async () => {
 
   let res;
   try { res = await apiFetch("/v1/me/sign", { method: "POST", body: fd }); }
-  catch {
-    if (btn) { btn.disabled = false; btn.textContent = "Подписать и скачать"; }
-    return showWorkMsg("Ошибка соединения", "error");
-  }
+  catch { return showWorkMsg("Ошибка соединения", "error"); }
 
   if (res.status === 429) {
-    if (btn) { btn.disabled = false; btn.textContent = "Подписать и скачать"; }
     showWorkMsg("Лимит документов исчерпан на этот месяц", "error");
     if (window.posthog) posthog.capture("limit_reached", {step: "sign"});
-    return loadWorkUsage();
+    loadWorkUsage();
+    return;
   }
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
-    if (btn) { btn.disabled = false; btn.textContent = "Подписать и скачать"; }
     return showWorkMsg(e.detail || "Ошибка подписания", "error");
   }
 
-  // Trigger download
   const blob = await res.blob();
   const baseName = _workFile.name.includes(".") ? _workFile.name.replace(/\.[^.]+$/, "") : _workFile.name;
-  const downloadName = "signed_" + baseName + ".pdf";
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = downloadName;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
-  if (window.posthog) posthog.capture("document_signed");
+  _signedFilename = "signed_" + baseName + ".pdf";
+  _signedBlob = blob;
 
-  // Preview signed PDF, opened on the first page containing a signature
   const firstSignedPage = (_workAnchors && _workAnchors.length > 0)
-    ? (parseInt(_workAnchors[0].page_hint || "0", 10) + 1)  // page_hint is 0-indexed
+    ? (parseInt(_workAnchors[0].page_hint || "0", 10) + 1)
     : 1;
   showPdfPreview(blob, firstSignedPage, "Подписанный документ");
 
-  // Reset button for re-use
-  if (btn) {
-    btn.disabled = false;
-    btn.textContent = "✅ Готово — загрузить другой?";
-    btn.onclick = () => {
-      _workFile = null; _workAnchors = null;
-      document.getElementById("work-result-card").style.display = "none";
-      showWorkMsg("", "");
-      resetPdfPreview();
-      // Reset file input
-      const fi = document.getElementById("work-file");
-      if (fi) fi.value = "";
-    };
+  const actionsEl = document.getElementById("preview-actions");
+  if (actionsEl) {
+    actionsEl.style.display = "flex";
+    const btnShare = document.getElementById("btn-share");
+    if (btnShare && !navigator.canShare) btnShare.style.display = "none";
   }
+
+  if (window.posthog) posthog.capture("document_signed");
   loadWorkUsage();
+}
+
+window.downloadSignedPdf = function() {
+  if (!_signedBlob) return;
+  const url = URL.createObjectURL(_signedBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = _signedFilename || 'signed.pdf';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+};
+
+window.shareSignedPdf = async function() {
+  if (!_signedBlob) return;
+  const file = new File([_signedBlob], _signedFilename || 'signed.pdf', { type: 'application/pdf' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: _signedFilename });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+  }
+  window.downloadSignedPdf();
 };
 
 function showWorkMsg(text, type) {
