@@ -66,7 +66,7 @@
   .nav-item.active { color: var(--c-accent); border-left-color: var(--c-accent); background: var(--c-accent-bg); }
   .nav-icon { font-size: 18px; width: 20px; text-align: center; }
   .main-content { flex: 1; padding: 2rem 1.5rem; max-width: 720px; overflow-y: auto; }
-  .main-content.wide { max-width: 1100px; }
+  .main-content.wide { max-width: none; padding: 1rem 1.5rem; overflow: hidden; display: flex; flex-direction: column; height: calc(100vh - 56px); }
   .section-title { font-size: 20px; font-weight: 600; margin-bottom: 0.25rem; }
   .section-sub { color: var(--c-muted); font-size: 14px; margin-bottom: 1.5rem; }
   .card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem; }
@@ -105,15 +105,17 @@
   .party-badge { font-size: 11px; background: var(--c-accent-bg); color: var(--c-accent); border-radius: 4px; padding: 0.15rem 0.4rem; }
 
   /* ── work tab: PDF preview ── */
-  .work-layout { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
+  .work-layout { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; flex: 1; min-height: 0; overflow: hidden; }
+  .work-left-col { overflow-y: auto; height: 100%; padding-right: 4px; }
   @media (max-width: 900px) {
-    .work-layout { grid-template-columns: 1fr; }
-    .pdf-preview-panel { position: static; height: 60vw; min-height: 300px; }
+    .main-content.wide { height: auto; overflow: visible; }
+    .work-layout { grid-template-columns: 1fr; overflow: visible; }
+    .work-left-col { height: auto; overflow: visible; }
+    .pdf-preview-panel { height: 60vw; min-height: 300px; }
   }
   .pdf-preview-panel { background: #fff; border: 1px solid var(--c-border);
-    border-radius: 10px; overflow: hidden; min-height: 500px;
-    display: flex; flex-direction: column; position: sticky; top: 1rem;
-    height: calc(100vh - 90px); }
+    border-radius: 10px; overflow: hidden;
+    display: flex; flex-direction: column; height: 100%; }
   .pdf-preview-toolbar { padding: 0.4rem 0.75rem; font-size: 12px; color: var(--c-muted);
     border-bottom: 1px solid var(--c-border); display: flex;
     align-items: center; justify-content: space-between;
@@ -307,7 +309,6 @@ const TABS = {
       <div id="profile-msg" class="msg"></div>
       <input class="input" id="pf-name" placeholder="ФИО">
       <input class="input" id="pf-company" placeholder="Компания">
-      <textarea class="input" id="pf-req" rows="3" placeholder="Реквизиты (ИНН, адрес, ...)" style="resize:vertical"></textarea>
       <button class="btn btn-primary" onclick="saveProfile()">Сохранить</button>
     </div>
     <div class="card">
@@ -399,7 +400,7 @@ const TABS = {
     <div class="section-sub" style="margin-bottom:1rem">Загрузите документ (PDF, DOCX) — найдём места подписания и проставим вашу подпись</div>
 
     <div class="work-layout">
-      <div>
+      <div class="work-left-col">
         <div class="card" style="padding:1rem 1.5rem">
           <div class="usage-row">
             <span>Документы в этом месяце</span>
@@ -457,8 +458,7 @@ const TABS = {
 
 window.showTab = (tab) => {
   _processedSigB64 = null;
-  _workFile = null; _workAnchors = null;
-  _signedBlob = null; _signedFilename = null;
+  // _workFile, _workAnchors, _signedBlob, _signedFilename persist across tabs
   document.querySelectorAll(".nav-item, .mobile-nav-item").forEach(el => el.classList.remove("active"));
   const navEl = document.getElementById("nav-" + tab);
   const mnavEl = document.getElementById("mnav-" + tab);
@@ -508,17 +508,15 @@ async function loadProfile() {
   const data = await res.json();
   const n = document.getElementById("pf-name");
   const c = document.getElementById("pf-company");
-  const r = document.getElementById("pf-req");
   if (n) n.value = data.full_name || "";
   if (c) c.value = data.company || "";
-  if (r) r.value = data.requisites || "";
 }
 
 window.saveProfile = async () => {
   const body = {
     full_name: document.getElementById("pf-name").value.trim(),
     company:   document.getElementById("pf-company").value.trim(),
-    requisites:document.getElementById("pf-req").value.trim(),
+    requisites: "",
   };
   const res = await apiFetch("/v1/me/profile", { method: "PUT", body: JSON.stringify(body) });
   const ok = res.ok;
@@ -734,6 +732,35 @@ async function initWorkTab() {
       e.preventDefault(); dz.style.borderColor = ""; dz.style.background = "";
       const f = e.dataTransfer.files[0]; if (f) handleWorkFile(f);
     });
+  }
+
+  // Restore document state if returning to work tab
+  if (_signedBlob) {
+    const firstSignedPage = (_workAnchors && _workAnchors.length > 0)
+      ? (parseInt(_workAnchors[0].page_hint || "0", 10) + 1)
+      : 1;
+    showPdfPreview(_signedBlob, firstSignedPage, "Подписанный документ");
+    const actionsEl = document.getElementById("preview-actions");
+    if (actionsEl) {
+      actionsEl.style.display = "flex";
+      const btnShare = document.getElementById("btn-share");
+      if (btnShare && !navigator.canShare) btnShare.style.display = "none";
+    }
+    if (_workAnchors) {
+      document.getElementById("work-result-card").style.display = "block";
+      renderAnalysisResult({ traffic_light: "green", anchors: _workAnchors, matches: [] });
+    }
+  } else if (_workFile) {
+    const isDocx = /\.(doc|docx)$/i.test(_workFile.name);
+    if (isDocx) {
+      showDocxPreview(_workFile);
+    } else {
+      showPdfPreview(_workFile, 1, "Исходный документ");
+    }
+    if (_workAnchors) {
+      document.getElementById("work-result-card").style.display = "block";
+      renderAnalysisResult({ traffic_light: "yellow", anchors: _workAnchors, matches: [] });
+    }
   }
 }
 
