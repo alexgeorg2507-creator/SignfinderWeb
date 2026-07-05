@@ -12,8 +12,10 @@ jobs:
 
       - name: Read web version
         run: |
-          WEB_VERSION=$(cat version.txt 2>/dev/null || echo "1.0.0")
+          BASE=$(cat version.txt | tr -d '[:space:]')
+          WEB_VERSION="${BASE}.${{ github.run_number }}"
           echo "WEB_VERSION=$WEB_VERSION" >> $GITHUB_ENV
+          echo "Version: $WEB_VERSION"
 
       - name: Inject version into cabinet HTML
         run: |

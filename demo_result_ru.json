@@ -1,0 +1,12 @@
+{
+  "traffic_light": "green",
+  "anchors_count": 2,
+  "review": {
+    "traffic_light": "yellow",
+    "remarks": [
+      {"severity": "warning", "text": "Срок действия договора не указан явно (п. 7.1)"},
+      {"severity": "ok", "text": "Стороны идентифицированы"},
+      {"severity": "warning", "text": "Проверьте порядок расчётов (раздел 5)"}
+    ]
+  }
+}

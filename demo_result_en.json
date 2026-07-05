@@ -1,0 +1,12 @@
+{
+  "traffic_light": "green",
+  "anchors_count": 2,
+  "review": {
+    "traffic_light": "yellow",
+    "remarks": [
+      {"severity": "warning", "text": "Contract term not explicitly stated (cl. 7.1)"},
+      {"severity": "ok", "text": "Parties identified"},
+      {"severity": "warning", "text": "Check payment schedule (section 5)"}
+    ]
+  }
+}

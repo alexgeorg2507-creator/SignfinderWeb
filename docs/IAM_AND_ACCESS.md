@@ -13,7 +13,7 @@
 |----|-------|------|------------|
 | Cloud Run runtime | `signfinder-api@signfinder-cab-test.iam.gserviceaccount.com` | `cloudsql.client`, `secretmanager.secretAccessor`, `storage.objectAdmin` | Рантайм API на test |
 | Cloud Build default | `625189729599@cloudbuild.gserviceaccount.com` | `cloudbuild.builds.builder`, `run.admin`, `editor` | Сборка и деплой |
-| GitHub Actions | `github-actions@signfinder-cab-test.iam.gserviceaccount.com` | `cloudbuild.builds.editor`, `secretmanager.secretAccessor`, `cloudsql.client`, `serviceusage.serviceUsageConsumer`, `storage.admin` (project-level), `iam.serviceAccountUser` on compute SA, `firebasehosting.admin` | CI/CD из GitHub Actions |
+| GitHub Actions | `github-actions@signfinder-cab-test.iam.gserviceaccount.com` | `cloudbuild.builds.editor`, `secretmanager.secretAccessor`, `cloudsql.client`, `serviceusage.serviceUsageConsumer`, `storage.admin`, `iam.serviceAccountUser` on compute SA, `firebasehosting.admin`, `run.viewer`, `run.developer`, `logging.viewer` | CI/CD |
 | Firebase Admin SDK | `firebase-adminsdk-fbsvc@signfinder-cab-test.iam.gserviceaccount.com` | `firebase.sdkAdminServiceAgent`, `firebaseauth.admin`, `iam.serviceAccountTokenCreator` | Firebase — не используется рантаймом API, только Firebase-консолью |
 
 **Примечание по `signfinder-api-sa`:** В IAM `signfinder-cab-test` есть и `signfinder-api-sa@`, и `signfinder-api@` — оба имеют `cloudsql.client` + `secretmanager.secretAccessor`. Первый, судя по всему, легаси SA от ранней настройки. Актуальный — `signfinder-api@signfinder-cab-test.iam.gserviceaccount.com` (прописан в `cloudbuild-test.yaml`).
