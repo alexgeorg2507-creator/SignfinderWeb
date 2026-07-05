@@ -807,8 +807,8 @@ async function showDocxPreview(file) {
         p { margin: 0 0 0.75rem; }
         table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
         td, th { border: 1px solid #ccc; padding: 4px 8px; }
-      </style>
-      </head><body>${html}</body></html>`;
+      <\/style>
+      <\/head><body>${html}<\/body><\/html>`;
     const blob = new Blob([styledHtml], { type: 'text/html' });
     showPdfPreview(blob, 1, 'Предпросмотр документа');
   } catch {
