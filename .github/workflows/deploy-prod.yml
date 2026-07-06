@@ -21,16 +21,13 @@ jobs:
           sed -i 's|<script>window\.__SF_VERSION__[^<]*</script>||g' app/index.html
           sed -i "s|</head>|<script>window.__SF_VERSION__ = '${{ env.WEB_VERSION }}';</script></head>|" app/index.html
 
-      - uses: google-github-actions/auth@v2
+      - name: Deploy to Firebase Hosting (prod)
+        uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          credentials_json: ${{ secrets.GOOGLE_CREDENTIALS_PROD }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-
-      - name: Deploy Firebase Hosting (prod)
-        run: |
-          npm install -g firebase-tools --silent
-          firebase deploy --only hosting --project=signfinder-prod
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
+          firebaseServiceAccount: "${{ secrets.GOOGLE_CREDENTIALS_PROD }}"
+          projectId: signfinder-prod
+          channelId: live
 
       - name: Notify Telegram
         if: always()
