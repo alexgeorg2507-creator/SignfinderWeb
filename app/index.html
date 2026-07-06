@@ -120,7 +120,9 @@
     border-bottom: 1px solid var(--c-border); display: flex;
     align-items: center; justify-content: space-between;
     background: var(--c-surface); flex-shrink: 0; }
-  .pdf-preview-iframe { flex: 1; border: none; width: 100%; height: 100%; background: #fff; display: block; }
+  .pdf-canvas-scroll { flex: 1; overflow-y: auto; background: #f0f0ee; padding: 1rem;
+    display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .pdf-canvas-page { background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.12); max-width: 100%; }
   .pdf-preview-empty { flex: 1; display: flex; align-items: center; justify-content: center;
     color: var(--c-muted); font-size: 13px; padding: 2rem; text-align: center; }
   .preview-actions { display: flex; gap: 0.5rem; }
@@ -143,7 +145,13 @@
   @media (max-width: 600px) { .main-content { padding-bottom: 5rem; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-</head>
+<script type="module">
+  import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+  window._pdfjsLib = pdfjsLib;
+</script>
+<\/head>
 <body>
 
 <!-- ── Auth screen ── -->
@@ -269,6 +277,7 @@ let _cachedVersionStr = null;
 let _workSigReady = false;
 let _signedBlob = null;
 let _signedFilename = null;
+let _currentRenderToken = 0;
 
 async function refreshToken() {
   if (!currentUser) return null;
@@ -442,13 +451,13 @@ const TABS = {
       <div class="pdf-preview-panel" id="pdf-preview-panel">
         <div class="pdf-preview-toolbar" id="pdf-preview-toolbar" style="display:none">
           <span id="pdf-preview-label">Предпросмотр</span>
+          <span id="pdf-preview-pages" style="font-size:11px;color:var(--c-muted);margin-left:0.5rem"></span>
           <div class="preview-actions" id="preview-actions" style="display:none">
             <button onclick="downloadSignedPdf()" title="Скачать">⬇️ Скачать</button>
             <button onclick="shareSignedPdf()" title="Поделиться" id="btn-share">↗️ Поделиться</button>
           </div>
         </div>
-        <iframe class="pdf-preview-iframe" id="pdf-preview-iframe"
-          style="display:none"></iframe>
+        <div class="pdf-canvas-scroll" id="pdf-canvas-scroll" style="display:none"></div>
         <div class="pdf-preview-empty" id="pdf-preview-empty">
           📄 Здесь появится<br>предпросмотр документа
         </div>
@@ -794,36 +803,77 @@ async function loadWorkUsage() {
 }
 
 // ── PDF preview panel ─────────────────────────────────────────────────────
-function showPdfPreview(pdfBlob, pageNumber, label) {
-  const iframe = document.getElementById('pdf-preview-iframe');
-  const empty  = document.getElementById('pdf-preview-empty');
-  const toolbar = document.getElementById('pdf-preview-toolbar');
-  const lbl    = document.getElementById('pdf-preview-label');
-  if (!iframe) return;
+async function showPdfPreview(pdfBlobOrFile, pageNumber, label) {
+  const scrollEl = document.getElementById('pdf-canvas-scroll');
+  const empty    = document.getElementById('pdf-preview-empty');
+  const toolbar  = document.getElementById('pdf-preview-toolbar');
+  const lbl      = document.getElementById('pdf-preview-label');
+  const pagesLbl = document.getElementById('pdf-preview-pages');
+  if (!scrollEl) return;
 
-  // Revoke previous blob URL
-  if (iframe._blobUrl) URL.revokeObjectURL(iframe._blobUrl);
+  // HTML blob (DOCX preview via mammoth) — use iframe fallback
+  if (pdfBlobOrFile.type === 'text/html') {
+    _fallbackIframePreview(pdfBlobOrFile, pageNumber, label);
+    return;
+  }
 
-  const url = URL.createObjectURL(pdfBlob);
-  iframe._blobUrl = url;
-  // Open on specific page using PDF fragment identifier
-  iframe.src = url + '#toolbar=0&navpanes=0' + (pageNumber > 1 ? '&page=' + pageNumber : '');
-  iframe.style.display = 'block';
+  const myToken = ++_currentRenderToken;
+
+  if (!window._pdfjsLib) {
+    _fallbackIframePreview(pdfBlobOrFile, pageNumber, label);
+    return;
+  }
+
+  scrollEl.innerHTML = '';
+  scrollEl.style.display = 'flex';
   empty.style.display = 'none';
   toolbar.style.display = 'flex';
   lbl.textContent = label || 'Предпросмотр';
+  if (pagesLbl) pagesLbl.textContent = '';
+
+  const arrayBuffer = await pdfBlobOrFile.arrayBuffer();
+  if (myToken !== _currentRenderToken) return;
+
+  const pdf = await window._pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  if (myToken !== _currentRenderToken) return;
+
+  if (pagesLbl) pagesLbl.textContent = pdf.numPages + ' стр.';
+
+  const containerWidth = scrollEl.clientWidth - 32;
+  const dpr = window.devicePixelRatio || 1;
+  let targetPageEl = null;
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    if (myToken !== _currentRenderToken) return;
+    const page = await pdf.getPage(i);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(containerWidth / baseViewport.width, 1.6);
+    const viewport = page.getViewport({ scale: scale * dpr });
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'pdf-canvas-page';
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.width  = (viewport.width  / dpr) + 'px';
+    canvas.style.height = (viewport.height / dpr) + 'px';
+    canvas.dataset.pageNum = i;
+
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    scrollEl.appendChild(canvas);
+    if (i === pageNumber) targetPageEl = canvas;
+  }
+
+  if (targetPageEl) {
+    requestAnimationFrame(() => targetPageEl.scrollIntoView({ block: 'start', behavior: 'instant' }));
+  }
 }
 
 function resetPdfPreview(emptyMessage) {
-  const iframe = document.getElementById('pdf-preview-iframe');
-  const empty  = document.getElementById('pdf-preview-empty');
-  const toolbar = document.getElementById('pdf-preview-toolbar');
-  if (iframe) {
-    if (iframe._blobUrl) URL.revokeObjectURL(iframe._blobUrl);
-    iframe._blobUrl = null;
-    iframe.src = '';
-    iframe.style.display = 'none';
-  }
+  _currentRenderToken++;
+  const scrollEl = document.getElementById('pdf-canvas-scroll');
+  const empty    = document.getElementById('pdf-preview-empty');
+  const toolbar  = document.getElementById('pdf-preview-toolbar');
+  if (scrollEl) { scrollEl.innerHTML = ''; scrollEl.style.display = 'none'; }
   if (empty) {
     empty.innerHTML = emptyMessage || '📄 Здесь появится<br>предпросмотр документа';
     empty.style.display = 'flex';
@@ -831,6 +881,21 @@ function resetPdfPreview(emptyMessage) {
   if (toolbar) toolbar.style.display = 'none';
   const actions = document.getElementById('preview-actions');
   if (actions) actions.style.display = 'none';
+}
+
+function _fallbackIframePreview(pdfBlobOrFile, pageNumber, label) {
+  const scrollEl = document.getElementById('pdf-canvas-scroll');
+  const toolbar  = document.getElementById('pdf-preview-toolbar');
+  const empty    = document.getElementById('pdf-preview-empty');
+  const lbl      = document.getElementById('pdf-preview-label');
+  if (!scrollEl) return;
+  const url = URL.createObjectURL(pdfBlobOrFile);
+  const page = pageNumber > 1 ? '#page=' + pageNumber : '';
+  scrollEl.innerHTML = `<iframe src="${url}${page}" style="width:100%;flex:1;border:none;min-height:500px"></iframe>`;
+  scrollEl.style.display = 'flex';
+  if (empty) empty.style.display = 'none';
+  if (toolbar) toolbar.style.display = 'flex';
+  if (lbl) lbl.textContent = label || 'Предпросмотр';
 }
 
 async function showDocxPreview(file) {
