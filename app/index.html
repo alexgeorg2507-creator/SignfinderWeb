@@ -539,7 +539,7 @@ window.saveProfile = async () => {
   };
   const res = await apiFetch("/v1/me/profile", { method: "PUT", body: JSON.stringify(body) });
   const ok = res.ok;
-  showTabMsg("profile-msg", ok ? "Сохранено" : "Ошибка сохранения", ok ? "success" : "error");
+  if (!ok) showTabMsg("profile-msg", "Ошибка сохранения", "error");
   if (ok && window.posthog) posthog.capture("profile_filled");
 };
 
