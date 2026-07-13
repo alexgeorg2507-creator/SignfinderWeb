@@ -125,12 +125,31 @@
   .pdf-canvas-page { background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.12); max-width: 100%; }
   .pdf-preview-empty { flex: 1; display: flex; align-items: center; justify-content: center;
     color: var(--c-muted); font-size: 13px; padding: 2rem; text-align: center; }
-  .preview-actions { display: flex; gap: 0.5rem; }
-  .preview-actions button { font-size: 12px; padding: 0.3rem 0.65rem;
-    border: 1px solid var(--c-border); border-radius: 8px;
-    background: var(--c-surface); cursor: pointer; font-family: inherit;
-    color: var(--c-text); transition: background .15s; }
-  .preview-actions button:hover { background: var(--c-bg); }
+  .preview-actions { display: flex; gap: 0.4rem; }
+  .icon-btn { display: flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; padding: 0; border: 1px solid var(--c-border);
+    border-radius: 8px; background: var(--c-surface); cursor: pointer;
+    color: var(--c-muted); transition: background .15s, color .15s, border-color .15s; }
+  .icon-btn:hover { background: var(--c-bg); }
+  .icon-btn svg { width: 16px; height: 16px; display: block; }
+  .icon-btn.active { color: var(--c-accent); border-color: var(--c-accent); background: var(--c-accent-bg); }
+  #btn-remember.active svg { fill: currentColor; }
+
+  /* ── Fix-7: manual signature placement ── */
+  .pdf-page-wrap { position: relative; }
+  .pdf-page-wrap.placing { cursor: crosshair; }
+  .sig-placer { position: absolute; border: 2px dashed var(--c-accent);
+    background: rgba(37,99,235,0.06); touch-action: none; cursor: move; }
+  .sig-placer img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; user-select: none; }
+  .sig-placer-handle { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px;
+    background: var(--c-accent); border: 2px solid #fff; border-radius: 50%;
+    cursor: nwse-resize; touch-action: none; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .sig-placer-controls { position: absolute; top: -32px; right: 0; display: flex; gap: 4px; }
+  .sig-placer-controls button { width: 24px; height: 24px; border-radius: 50%; border: none;
+    cursor: pointer; font-size: 13px; line-height: 1; display: flex; align-items: center;
+    justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .sig-placer-confirm { background: var(--c-success); color: #fff; }
+  .sig-placer-cancel { background: var(--c-danger); color: #fff; }
 
   /* ── responsive ── */
   @media (max-width: 600px) {
@@ -279,6 +298,17 @@ let _signedBlob = null;
 let _signedFilename = null;
 let _currentRenderToken = 0;
 
+// ── Fix-7 state: remembered templates / manual placement / page exclusion ──
+let _workAnalyzeResult = null;   // full /v1/me/analyze response
+let _rememberedTemplateId = null;
+let _manualAnchors = [];         // [{page, x, y, width, height}] — PDF points, 1-indexed page
+let _excludePages = [];          // 1-indexed pages with auto anchors dropped
+let _manualPlaceMode = false;
+let _currentVisiblePage = 1;
+let _pageObserver = null;
+let _signatureImgUrl = null;
+let _activePlacer = null;
+
 async function refreshToken() {
   if (!currentUser) return null;
   idToken = await currentUser.getIdToken(false);
@@ -406,8 +436,6 @@ const TABS = {
     </div>`,
 
   work: `
-    <div class="section-sub" style="margin-bottom:1rem">Загрузите документ (PDF, DOCX) — найдём места подписания и проставим вашу подпись</div>
-
     <div class="work-layout">
       <div class="work-left-col">
         <div class="card" style="padding:1rem 1.5rem">
@@ -453,8 +481,21 @@ const TABS = {
           <span id="pdf-preview-label">Предпросмотр</span>
           <span id="pdf-preview-pages" style="font-size:11px;color:var(--c-muted);margin-left:0.5rem"></span>
           <div class="preview-actions" id="preview-actions" style="display:none">
-            <button onclick="downloadSignedPdf()" title="Скачать">⬇️ Скачать</button>
-            <button onclick="shareSignedPdf()" title="Поделиться" id="btn-share">↗️ Поделиться</button>
+            <button class="icon-btn" id="btn-remember" onclick="toggleRememberTemplate()" title="Запомнить шаблон">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-manual-place" onclick="toggleManualPlaceMode()" title="Поставить подпись вручную">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-erase-page" onclick="eraseCurrentPageSignature()" title="Удалить подпись на текущей странице">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8l-6-6a2 2 0 0 1 0-2.83l8.59-8.59a2 2 0 0 1 2.82 0l6 6a2 2 0 0 1 0 2.83L13 18"/><path d="M8 20L3.5 15.5"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-download" onclick="downloadSignedPdf()" title="Скачать">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-share" onclick="shareSignedPdf()" title="Поделиться">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
+            </button>
           </div>
         </div>
         <div class="pdf-canvas-scroll" id="pdf-canvas-scroll" style="display:none"></div>
@@ -755,16 +796,8 @@ async function initWorkTab() {
 
   // Restore document state if returning to work tab
   if (_signedBlob) {
-    const firstSignedPage = (_workAnchors && _workAnchors.length > 0)
-      ? (parseInt(_workAnchors[0].page_hint || "0", 10) + 1)
-      : 1;
-    showPdfPreview(_signedBlob, firstSignedPage, "Подписанный документ");
-    const actionsEl = document.getElementById("preview-actions");
-    if (actionsEl) {
-      actionsEl.style.display = "flex";
-      const btnShare = document.getElementById("btn-share");
-      if (btnShare && !navigator.canShare) btnShare.style.display = "none";
-    }
+    showPdfPreview(_signedBlob, _firstSignedPageNum(), "Подписанный документ");
+    _updateToolbarActions();
     if (_workAnchors) {
       document.getElementById("work-result-card").style.display = "block";
       renderAnalysisResult({ traffic_light: "green", anchors: _workAnchors, matches: [] });
@@ -776,11 +809,20 @@ async function initWorkTab() {
     } else {
       showPdfPreview(_workFile, 1, "Исходный документ");
     }
+    _updateToolbarActions();
     if (_workAnchors) {
       document.getElementById("work-result-card").style.display = "block";
       renderAnalysisResult({ traffic_light: "yellow", anchors: _workAnchors, matches: [] });
     }
   }
+}
+
+function _firstSignedPageNum() {
+  if (_workAnchors && _workAnchors.length) {
+    return parseInt(_workAnchors[0].page_hint || "0", 10) + 1;
+  }
+  if (_manualAnchors.length) return _manualAnchors[0].page;
+  return 1;
 }
 
 async function loadWorkUsage() {
@@ -824,12 +866,16 @@ async function showPdfPreview(pdfBlobOrFile, pageNumber, label) {
     return;
   }
 
-  scrollEl.innerHTML = '';
+  // Reveal the container (and its layout/clientWidth) up front, but leave its
+  // *children* untouched until the new pages are ready — old canvases (if any)
+  // stay visible the whole time instead of a blank flash (Fix-7 C.7). This
+  // also matters on the very first render of a session: pdf-canvas-scroll
+  // starts display:none, and computing containerWidth against a display:none
+  // element would give clientWidth=0 → a broken negative scale.
   scrollEl.style.display = 'flex';
   empty.style.display = 'none';
   toolbar.style.display = 'flex';
   lbl.textContent = label || 'Предпросмотр';
-  if (pagesLbl) pagesLbl.textContent = '';
 
   const arrayBuffer = await pdfBlobOrFile.arrayBuffer();
   if (myToken !== _currentRenderToken) return;
@@ -837,11 +883,14 @@ async function showPdfPreview(pdfBlobOrFile, pageNumber, label) {
   const pdf = await window._pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   if (myToken !== _currentRenderToken) return;
 
-  if (pagesLbl) pagesLbl.textContent = pdf.numPages + ' стр.';
-
   const containerWidth = scrollEl.clientWidth - 32;
   const dpr = window.devicePixelRatio || 1;
-  let targetPageEl = null;
+
+  // Fix-7: render into a detached fragment and swap in with one replaceChildren()
+  // once every page is ready — the old preview (if any) stays on screen the
+  // whole time instead of flashing empty mid-render.
+  const fragment = document.createDocumentFragment();
+  let targetWrapEl = null;
 
   for (let i = 1; i <= pdf.numPages; i++) {
     if (myToken !== _currentRenderToken) return;
@@ -857,14 +906,35 @@ async function showPdfPreview(pdfBlobOrFile, pageNumber, label) {
     canvas.style.width  = (viewport.width  / dpr) + 'px';
     canvas.style.height = (viewport.height / dpr) + 'px';
     canvas.dataset.pageNum = i;
+    // Fix-7: PDF-points-per-CSS-pixel ratio for this page, used by
+    // canvasToPdfCoords() to place manual signatures.
+    canvas._pdfScale = scale;
+    canvas._pdfWidthPt = baseViewport.width;
+    canvas._pdfHeightPt = baseViewport.height;
 
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    scrollEl.appendChild(canvas);
-    if (i === pageNumber) targetPageEl = canvas;
+    if (myToken !== _currentRenderToken) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'pdf-page-wrap';
+    wrap.dataset.pageNum = i;
+    wrap.style.width = canvas.style.width;
+    wrap.style.height = canvas.style.height;
+    wrap.appendChild(canvas);
+    fragment.appendChild(wrap);
+    if (i === pageNumber) targetWrapEl = wrap;
   }
 
-  if (targetPageEl) {
-    requestAnimationFrame(() => targetPageEl.scrollIntoView({ block: 'start', behavior: 'instant' }));
+  if (myToken !== _currentRenderToken) return;
+
+  scrollEl.replaceChildren(fragment);
+  if (pagesLbl) pagesLbl.textContent = pdf.numPages + ' стр.';
+
+  _attachPageObserver();
+  if (_manualPlaceMode) _attachPlacementClickHandlers();
+
+  if (targetWrapEl) {
+    requestAnimationFrame(() => targetWrapEl.scrollIntoView({ block: 'start', behavior: 'instant' }));
   }
 }
 
@@ -881,6 +951,7 @@ function resetPdfPreview(emptyMessage) {
   if (toolbar) toolbar.style.display = 'none';
   const actions = document.getElementById('preview-actions');
   if (actions) actions.style.display = 'none';
+  if (_pageObserver) { _pageObserver.disconnect(); _pageObserver = null; }
 }
 
 function _fallbackIframePreview(pdfBlobOrFile, pageNumber, label) {
@@ -935,8 +1006,9 @@ async function handleWorkFile(file) {
   }
   _workFile = file; _workAnchors = null;
   _signedBlob = null; _signedFilename = null;
-  const actionsEl = document.getElementById('preview-actions');
-  if (actionsEl) actionsEl.style.display = 'none';
+  _workAnalyzeResult = null; _rememberedTemplateId = null;
+  _manualAnchors = []; _excludePages = []; _manualPlaceMode = false;
+  _updateToolbarActions();
   document.getElementById("work-result-card").style.display = "none";
   showWorkMsg("", "");
 
@@ -974,7 +1046,10 @@ async function handleWorkFile(file) {
 
   const result = await res.json();
   _workAnchors = result.anchors || [];
+  _workAnalyzeResult = result;
+  _rememberedTemplateId = result.from_template ? (result.template_id || null) : null;
   renderAnalysisResult(result);
+  _updateToolbarActions();
 
   const n = _workAnchors.length;
   const signArea = document.getElementById("work-sign-area");
@@ -1054,12 +1129,16 @@ function renderAnalysisResult(result) {
 }
 
 async function workSign() {
-  if (!_workFile || !_workAnchors || !_workAnchors.length) return;
+  if (!_workFile) return;
+  const hasAnchors = (_workAnchors && _workAnchors.length) || _manualAnchors.length;
+  if (!hasAnchors) return;
   showWorkMsg("", "");
 
   const fd = new FormData();
   fd.append("file", _workFile);
-  fd.append("anchors_json", JSON.stringify(_workAnchors));
+  fd.append("anchors_json", JSON.stringify(_workAnchors || []));
+  fd.append("manual_anchors_json", JSON.stringify(_manualAnchors));
+  fd.append("exclude_pages_json", JSON.stringify(_excludePages));
 
   let res;
   try { res = await apiFetch("/v1/me/sign", { method: "POST", body: fd }); }
@@ -1081,21 +1160,290 @@ async function workSign() {
   _signedFilename = "signed_" + baseName + ".pdf";
   _signedBlob = blob;
 
-  const firstSignedPage = (_workAnchors && _workAnchors.length > 0)
-    ? (parseInt(_workAnchors[0].page_hint || "0", 10) + 1)
-    : 1;
-  showPdfPreview(blob, firstSignedPage, "Подписанный документ");
-
-  const actionsEl = document.getElementById("preview-actions");
-  if (actionsEl) {
-    actionsEl.style.display = "flex";
-    const btnShare = document.getElementById("btn-share");
-    if (btnShare && !navigator.canShare) btnShare.style.display = "none";
-  }
+  showPdfPreview(blob, _firstSignedPageNum(), "Подписанный документ");
+  _updateToolbarActions();
 
   if (window.posthog) posthog.capture("document_signed");
   loadWorkUsage();
 }
+
+// ── Fix-7: remember/forget templates, manual placement, page erase ─────────
+
+function _updateRememberButton() {
+  const btn = document.getElementById('btn-remember');
+  if (!btn) return;
+  const active = !!_rememberedTemplateId;
+  btn.classList.toggle('active', active);
+  btn.title = active ? 'Забыть шаблон' : 'Запомнить шаблон';
+}
+
+function _updateToolbarActions() {
+  const actionsEl = document.getElementById('preview-actions');
+  if (!actionsEl) return;
+  actionsEl.style.display = _workAnalyzeResult ? 'flex' : 'none';
+
+  const hasSigned = !!_signedBlob;
+  const dl = document.getElementById('btn-download');
+  const sh = document.getElementById('btn-share');
+  const manualBtn = document.getElementById('btn-manual-place');
+  const eraseBtn = document.getElementById('btn-erase-page');
+
+  if (dl) dl.style.display = hasSigned ? 'flex' : 'none';
+  if (sh) sh.style.display = (hasSigned && navigator.canShare) ? 'flex' : 'none';
+  if (manualBtn) manualBtn.style.display = _workSigReady ? 'flex' : 'none';
+  if (eraseBtn) eraseBtn.style.display = hasSigned ? 'flex' : 'none';
+
+  _updateRememberButton();
+}
+
+window.toggleRememberTemplate = async function() {
+  if (!_workAnalyzeResult) return;
+  const btn = document.getElementById('btn-remember');
+  if (btn) btn.disabled = true;
+  try {
+    if (_rememberedTemplateId) {
+      const res = await apiFetch(`/v1/me/templates/${_rememberedTemplateId}`, { method: 'DELETE' });
+      if (res.ok || res.status === 404) {
+        _rememberedTemplateId = null;
+        showWorkMsg('Шаблон забыт', 'success');
+      } else {
+        showWorkMsg('Не удалось забыть шаблон', 'error');
+      }
+    } else {
+      const fp = (_workAnalyzeResult && _workAnalyzeResult.fingerprint) || {};
+      const body = {
+        fingerprint: fp,
+        anchors: _workAnchors || [],
+        language: fp.language || 'ru',
+        synonyms_used: (_workAnalyzeResult && _workAnalyzeResult.synonyms_used) || {},
+      };
+      const res = await apiFetch('/v1/me/templates/remember', { method: 'POST', body: JSON.stringify(body) });
+      if (res.ok) {
+        const data = await res.json();
+        _rememberedTemplateId = data.template_id;
+        showWorkMsg('Шаблон запомнен', 'success');
+      } else {
+        showWorkMsg('Не удалось запомнить шаблон', 'error');
+      }
+    }
+  } catch {
+    showWorkMsg('Ошибка соединения', 'error');
+  }
+  if (btn) btn.disabled = false;
+  _updateRememberButton();
+};
+
+// canvas CSS-pixel offset → PDF points. fitz/PyMuPDF (signfinder-core) uses a
+// top-left-origin, Y-down coordinate system — same orientation as <canvas> —
+// so this is a plain unscale, no Y-flip (unlike raw bottom-up PDF coordinates).
+function canvasToPdfCoords(canvasX, canvasY, pageCanvas) {
+  const scale = (pageCanvas && pageCanvas._pdfScale) || 1;
+  return { x: canvasX / scale, y: canvasY / scale };
+}
+
+async function _getSignatureImgUrl() {
+  if (_signatureImgUrl) return _signatureImgUrl;
+  const token = await refreshToken();
+  let res;
+  try {
+    res = await fetch("/api/v1/me/signature", { headers: { Authorization: "Bearer " + token } });
+  } catch { return null; }
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  _signatureImgUrl = URL.createObjectURL(blob);
+  return _signatureImgUrl;
+}
+
+window.toggleManualPlaceMode = async function() {
+  if (!_workFile) return;
+  if (!_workSigReady) { showWorkMsg('Сначала загрузите подпись в разделе «Подпись»', 'error'); return; }
+  _manualPlaceMode = !_manualPlaceMode;
+  const btn = document.getElementById('btn-manual-place');
+  if (btn) btn.classList.toggle('active', _manualPlaceMode);
+  if (_manualPlaceMode) {
+    const url = await _getSignatureImgUrl();
+    if (!url) {
+      showWorkMsg('Не удалось загрузить подпись', 'error');
+      _manualPlaceMode = false;
+      if (btn) btn.classList.remove('active');
+      return;
+    }
+    showWorkMsg('Нажмите на документ там, где нужно поставить подпись', 'info');
+    _attachPlacementClickHandlers();
+  } else {
+    _detachPlacementClickHandlers();
+    showWorkMsg('', '');
+  }
+};
+
+function _attachPlacementClickHandlers() {
+  document.querySelectorAll('.pdf-page-wrap').forEach(wrap => {
+    wrap.classList.add('placing');
+    wrap.addEventListener('click', _onPagePlaceClick);
+  });
+}
+function _detachPlacementClickHandlers() {
+  document.querySelectorAll('.pdf-page-wrap').forEach(wrap => {
+    wrap.classList.remove('placing');
+    wrap.removeEventListener('click', _onPagePlaceClick);
+  });
+}
+
+async function _onPagePlaceClick(e) {
+  if (!_manualPlaceMode || _activePlacer) return;
+  if (e.target.closest('.sig-placer')) return;
+  const wrap = e.currentTarget;
+  const canvas = wrap.querySelector('canvas');
+  if (!canvas) return;
+  const rect = wrap.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const clickY = e.clientY - rect.top;
+  const imgUrl = await _getSignatureImgUrl();
+
+  const defaultW = Math.min(130, rect.width * 0.5);
+  const defaultH = defaultW * 0.42;
+  const left = Math.max(0, Math.min(clickX - defaultW / 2, rect.width - defaultW));
+  const top  = Math.max(0, Math.min(clickY - defaultH / 2, rect.height - defaultH));
+
+  const placer = document.createElement('div');
+  placer.className = 'sig-placer';
+  placer.style.left = left + 'px';
+  placer.style.top = top + 'px';
+  placer.style.width = defaultW + 'px';
+  placer.style.height = defaultH + 'px';
+  placer.innerHTML = `
+    <img src="${imgUrl || ''}" draggable="false">
+    <div class="sig-placer-handle"></div>
+    <div class="sig-placer-controls">
+      <button class="sig-placer-confirm" type="button" title="Подтвердить">✓</button>
+      <button class="sig-placer-cancel" type="button" title="Отменить">×</button>
+    </div>`;
+  wrap.appendChild(placer);
+  _activePlacer = { el: placer, wrap, canvas };
+
+  _wirePlacerDrag(placer, wrap);
+  placer.querySelector('.sig-placer-confirm').addEventListener('click', (ev) => { ev.stopPropagation(); _confirmPlacer(); });
+  placer.querySelector('.sig-placer-cancel').addEventListener('click', (ev) => { ev.stopPropagation(); _cancelPlacer(); });
+}
+
+function _wirePlacerDrag(placer, wrap) {
+  let mode = null; // 'move' | 'resize'
+  let startX, startY, startLeft, startTop, startW, startH;
+
+  function onMove(e) {
+    if (!mode) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    const wrapRect = wrap.getBoundingClientRect();
+    if (mode === 'move') {
+      const left = Math.max(0, Math.min(startLeft + dx, wrapRect.width - startW));
+      const top  = Math.max(0, Math.min(startTop + dy, wrapRect.height - startH));
+      placer.style.left = left + 'px';
+      placer.style.top = top + 'px';
+    } else {
+      const w = Math.max(40, Math.min(startW + dx, wrapRect.width - startLeft));
+      const h = Math.max(20, Math.min(startH + dy, wrapRect.height - startTop));
+      placer.style.width = w + 'px';
+      placer.style.height = h + 'px';
+    }
+  }
+  function onUp() {
+    mode = null;
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+  }
+  function startDrag(resize) {
+    return (e) => {
+      mode = resize ? 'resize' : 'move';
+      startX = e.clientX; startY = e.clientY;
+      startLeft = parseFloat(placer.style.left);
+      startTop = parseFloat(placer.style.top);
+      startW = parseFloat(placer.style.width);
+      startH = parseFloat(placer.style.height);
+      e.preventDefault();
+      e.stopPropagation();
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    };
+  }
+
+  placer.addEventListener('pointerdown', startDrag(false));
+  placer.querySelector('.sig-placer-handle').addEventListener('pointerdown', startDrag(true));
+}
+
+async function _confirmPlacer() {
+  if (!_activePlacer) return;
+  const { el, wrap, canvas } = _activePlacer;
+  const left = parseFloat(el.style.left);
+  const top = parseFloat(el.style.top);
+  const w = parseFloat(el.style.width);
+  const h = parseFloat(el.style.height);
+  const scale = canvas._pdfScale || 1;
+  const topLeftPdf = canvasToPdfCoords(left, top, canvas);
+  const pageNum = parseInt(wrap.dataset.pageNum, 10);
+
+  _manualAnchors.push({
+    page: pageNum,
+    x: topLeftPdf.x,
+    y: topLeftPdf.y,
+    width: w / scale,
+    height: h / scale,
+  });
+
+  el.remove();
+  _activePlacer = null;
+  _manualPlaceMode = false;
+  const btn = document.getElementById('btn-manual-place');
+  if (btn) btn.classList.remove('active');
+  _detachPlacementClickHandlers();
+
+  showWorkSpinner('Подписываем...');
+  await workSign();
+  hideWorkSpinner();
+}
+
+function _cancelPlacer() {
+  if (!_activePlacer) return;
+  _activePlacer.el.remove();
+  _activePlacer = null;
+}
+
+function _attachPageObserver() {
+  if (_pageObserver) { _pageObserver.disconnect(); _pageObserver = null; }
+  const scrollEl = document.getElementById('pdf-canvas-scroll');
+  if (!scrollEl) return;
+  const wraps = scrollEl.querySelectorAll('.pdf-page-wrap');
+  if (!wraps.length) return;
+
+  const visibility = new Map();
+  _pageObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const pn = parseInt(entry.target.dataset.pageNum, 10);
+      visibility.set(pn, entry.intersectionRatio);
+    });
+    let best = null, bestRatio = 0;
+    visibility.forEach((ratio, pn) => {
+      if (ratio > bestRatio) { bestRatio = ratio; best = pn; }
+    });
+    if (best) _currentVisiblePage = best;
+  }, { root: scrollEl, threshold: [0, 0.25, 0.5, 0.75, 1] });
+
+  wraps.forEach(w => _pageObserver.observe(w));
+}
+
+window.eraseCurrentPageSignature = async function() {
+  const page = _currentVisiblePage || 1;
+  const before = _manualAnchors.length;
+  _manualAnchors = _manualAnchors.filter(a => a.page !== page);
+  if (_manualAnchors.length === before) {
+    if (_excludePages.includes(page)) {
+      return showWorkMsg('На этой странице уже нет подписи', 'info');
+    }
+    _excludePages.push(page);
+  }
+  showWorkSpinner('Обновляем...');
+  await workSign();
+  hideWorkSpinner();
+};
 
 window.downloadSignedPdf = function() {
   if (!_signedBlob) return;
