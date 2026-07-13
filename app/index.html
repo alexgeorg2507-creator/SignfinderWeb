@@ -1117,10 +1117,33 @@ function renderAnalysisResult(result) {
   if (result.error) showWorkMsg(result.error, "info");
 }
 
+// Rough client-side "does this anchor survive exclude_pages" check — mirrors
+// what the server does. Backend is source of truth; this only avoids a
+// spurious "no anchors" error toast when the user has just erased everything.
+function _anchorSurvivesExclude(a) {
+  const ph = String(a.page_hint || "0");
+  if (ph === "first") return !_excludePages.includes(1);
+  if (ph === "last" || ph === "any") return true;  // can't resolve on client
+  const n = parseInt(ph, 10);
+  return Number.isNaN(n) ? true : !_excludePages.includes(n + 1);
+}
+
 async function workSign() {
   if (!_workFile) return;
-  const hasAnchors = (_workAnchors && _workAnchors.length) || _manualAnchors.length;
-  if (!hasAnchors) return;
+  const surviving = (_workAnchors || []).filter(_anchorSurvivesExclude);
+  const hasAnchors = surviving.length || _manualAnchors.length;
+
+  // Everything erased → treat as "revert to unsigned" instead of surfacing a
+  // "no anchors" error. Skip the server call entirely (no usage burned).
+  if (!hasAnchors) {
+    _signedBlob = null;
+    _signedFilename = null;
+    showPdfPreview(_workFile, _currentVisiblePage || 1, "Исходный документ");
+    _updateToolbarActions();
+    showWorkMsg("", "");
+    return;
+  }
+
   showWorkMsg("", "");
 
   const fd = new FormData();
@@ -1141,6 +1164,16 @@ async function workSign() {
   }
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
+    // Server also rejects "no anchors" — same fallback as the pre-flight branch
+    // above, in case a "first"/"last"/"any" hint hid the empty-set from us.
+    if (res.status === 422 && (e.detail || "").includes("Нет якорей")) {
+      _signedBlob = null;
+      _signedFilename = null;
+      showPdfPreview(_workFile, _currentVisiblePage || 1, "Исходный документ");
+      _updateToolbarActions();
+      showWorkMsg("", "");
+      return;
+    }
     return showWorkMsg(e.detail || "Ошибка подписания", "error");
   }
 
