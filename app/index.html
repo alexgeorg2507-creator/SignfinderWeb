@@ -163,7 +163,6 @@
   .mobile-nav-icon { font-size: 20px; }
   @media (max-width: 600px) { .main-content { padding-bottom: 5rem; } }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script type="module">
   import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
   pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -803,12 +802,9 @@ async function initWorkTab() {
       renderAnalysisResult({ traffic_light: "green", anchors: _workAnchors, matches: [] });
     }
   } else if (_workFile) {
-    const isDocx = /\.(doc|docx)$/i.test(_workFile.name);
-    if (isDocx) {
-      showDocxPreview(_workFile);
-    } else {
-      showPdfPreview(_workFile, 1, "Исходный документ");
-    }
+    // _workFile is always a PDF here — handleWorkFile converts DOC/DOCX
+    // to PDF via /v1/me/convert before storing it.
+    showPdfPreview(_workFile, 1, "Исходный документ");
     _updateToolbarActions();
     if (_workAnchors) {
       document.getElementById("work-result-card").style.display = "block";
@@ -852,12 +848,6 @@ async function showPdfPreview(pdfBlobOrFile, pageNumber, label) {
   const lbl      = document.getElementById('pdf-preview-label');
   const pagesLbl = document.getElementById('pdf-preview-pages');
   if (!scrollEl) return;
-
-  // HTML blob (DOCX preview via mammoth) — use iframe fallback
-  if (pdfBlobOrFile.type === 'text/html') {
-    _fallbackIframePreview(pdfBlobOrFile, pageNumber, label);
-    return;
-  }
 
   const myToken = ++_currentRenderToken;
 
@@ -969,30 +959,18 @@ function _fallbackIframePreview(pdfBlobOrFile, pageNumber, label) {
   if (lbl) lbl.textContent = label || 'Предпросмотр';
 }
 
-async function showDocxPreview(file) {
-  if (typeof mammoth === 'undefined') {
-    resetPdfPreview('📄 Предпросмотр DOC/DOCX недоступен.');
-    return;
+// Convert DOC/DOCX to PDF on the server (LibreOffice) so the preview matches
+// exactly what will be signed — the previous mammoth.js path threw away
+// fonts, footers, and positioning.
+async function convertDocxToPdfBlob(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await apiFetch("/v1/me/convert", { method: "POST", body: fd });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.detail || "Не удалось конвертировать документ");
   }
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
-    const styledHtml = `<!DOCTYPE html><html><head>
-      <meta charset="UTF-8">
-      <style>
-        body { font-family: -apple-system, 'Segoe UI', sans-serif;
-               font-size: 14px; line-height: 1.6; padding: 1.5rem;
-               color: #1a1a18; max-width: 100%; }
-        p { margin: 0 0 0.75rem; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
-        td, th { border: 1px solid #ccc; padding: 4px 8px; }
-      <\/style>
-      <\/head><body>${html}<\/body><\/html>`;
-    const blob = new Blob([styledHtml], { type: 'text/html' });
-    showPdfPreview(blob, 1, 'Предпросмотр документа');
-  } catch {
-    resetPdfPreview('📄 Не удалось отобразить DOC/DOCX.');
-  }
+  return await res.blob();
 }
 
 async function handleWorkFile(file) {
@@ -1012,10 +990,21 @@ async function handleWorkFile(file) {
   document.getElementById("work-result-card").style.display = "none";
   showWorkMsg("", "");
 
-  // Show preview immediately — DOCX via mammoth.js, PDF inline
+  // DOC/DOCX → convert on the server first (LibreOffice) so preview and
+  // signed output are identical. From this point on _workFile is the PDF.
   const isDocx = /\.(doc|docx)$/i.test(file.name);
   if (isDocx) {
-    showDocxPreview(file);
+    showWorkSpinner("Конвертируем документ...");
+    let pdfBlob;
+    try {
+      pdfBlob = await convertDocxToPdfBlob(file);
+    } catch (e) {
+      hideWorkSpinner();
+      return showWorkMsg(e.message || "Не удалось конвертировать документ", "error");
+    }
+    const baseName = file.name.replace(/\.[^.]+$/, "");
+    _workFile = new File([pdfBlob], baseName + ".pdf", { type: "application/pdf" });
+    showPdfPreview(_workFile, 1, "Исходный документ");
   } else {
     showPdfPreview(file, 1, "Исходный документ");
   }
@@ -1023,7 +1012,7 @@ async function handleWorkFile(file) {
   showWorkSpinner("Анализируем документ...");
 
   const fd = new FormData();
-  fd.append("file", file);
+  fd.append("file", _workFile);
   let res;
   try { res = await apiFetch("/v1/me/analyze", { method: "POST", body: fd }); }
   catch { hideWorkSpinner(); return showWorkMsg("Ошибка соединения", "error"); }
