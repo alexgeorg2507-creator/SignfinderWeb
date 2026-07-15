@@ -1233,9 +1233,27 @@ window.toggleRememberTemplate = async function() {
       }
     } else {
       const fp = (_workAnalyzeResult && _workAnalyzeResult.fingerprint) || {};
+      // Fix-10.1: remember the same set workSign() actually stamped — surviving
+      // auto/template anchors (minus excluded pages) plus manual placements —
+      // not the raw untouched analyze() output.
+      const survivingAuto = (_workAnchors || []).filter(_anchorSurvivesExclude);
+      const manualAsAnchors = _manualAnchors.map(m => ({
+        id: `manual_${m.page}_${Math.round(m.x)}_${Math.round(m.y)}`,
+        anchor_level: 1,
+        anchor_text: '',
+        position: 'on',
+        generated_pattern: '',
+        bbox: [m.x, m.y, m.x + m.width, m.y + m.height],
+        // TextAnchor.added_by is a two-value enum: "auto_regex" | "manual_click"
+        // (signfinder-core/anchors/models.py) — "manual_click" is the established
+        // provenance apply_template_anchors() checks for to reapply this bbox
+        // exactly (no text search) when the remembered template matches again.
+        added_by: 'manual_click',
+        page_hint: String(m.page - 1),  // TextAnchor page_hint is 0-indexed; m.page is 1-indexed
+      }));
       const body = {
         fingerprint: fp,
-        anchors: _workAnchors || [],
+        anchors: [...survivingAuto, ...manualAsAnchors],
         language: fp.language || 'ru',
         synonyms_used: (_workAnalyzeResult && _workAnalyzeResult.synonyms_used) || {},
       };
