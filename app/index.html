@@ -468,8 +468,7 @@ const TABS = {
         </div>
 
         <div id="work-result-card" style="display:none" class="card">
-          <div id="work-traffic-light"></div>
-          <div id="work-parties"></div>
+          <div id="work-our-side"></div>
           <div id="work-anchor-info" style="font-size:14px;color:var(--c-muted);margin-bottom:1rem"></div>
           <div id="work-sign-area"></div>
         </div>
@@ -799,7 +798,7 @@ async function initWorkTab() {
     _updateToolbarActions();
     if (_workAnchors) {
       document.getElementById("work-result-card").style.display = "block";
-      renderAnalysisResult({ traffic_light: "green", anchors: _workAnchors, matches: [] });
+      renderAnalysisResult(_workAnalyzeResult || { anchors: _workAnchors });
     }
   } else if (_workFile) {
     // _workFile is always a PDF here — handleWorkFile converts DOC/DOCX
@@ -808,7 +807,7 @@ async function initWorkTab() {
     _updateToolbarActions();
     if (_workAnchors) {
       document.getElementById("work-result-card").style.display = "block";
-      renderAnalysisResult({ traffic_light: "yellow", anchors: _workAnchors, matches: [] });
+      renderAnalysisResult(_workAnalyzeResult || { anchors: _workAnchors });
     }
   }
 }
@@ -1094,49 +1093,25 @@ function renderAnalysisResult(result) {
   if (!card) return;
   card.style.display = "block";
 
-  // Traffic light
-  const tlEl = document.getElementById("work-traffic-light");
-  const tl = result.traffic_light;
-  const tlMap = {
-    green:    ["green",  "✅ Места подписи найдены"],
-    yellow:   ["yellow", "⚠️ Найдено с низкой уверенностью"],
-    no_match: ["red",    "❌ Места подписи не найдены"],
-  };
-  const [cls, label] = tlMap[tl] || tlMap.no_match;
-  tlEl.innerHTML = `<div class="traffic-pill ${cls}">${label}</div>`;
+  // Fix-13: "Наша сторона" вместо traffic light + полного списка сторон —
+  // confidence/traffic_light внутренняя dev-метрика, источник (свежий
+  // анализ/шаблон) уже виден в шапке превью (Fix-11).
+  const sideEl = document.getElementById("work-our-side");
+  const ourSide = result.our_side || {};
+  const synonyms = result.synonyms_used || {};
+  const displayName = ourSide.signer || ourSide.legal_entity
+    || synonyms.signer || synonyms.legal_entity || '';
+  const roles = (ourSide.roles && ourSide.roles.length) ? ourSide.roles : (synonyms.roles || []);
+  const alias = roles.length ? roles[0] : '';
 
-  // Parties found
-  const partiesEl = document.getElementById("work-parties");
-  const matches = result.matches || [];
-  const parties = [...new Set(matches.map(m => m.party).filter(Boolean))];
-  const ourSideName = result.our_side
-    ? (result.our_side.party || result.our_side.name || result.our_side.alias || "")
-    : "";
-  const templateName = (_workPartyTemplate && _workPartyTemplate.name) || "";
-  if (parties.length) {
-    const rows = parties.map(p => {
-      const cnt = matches.filter(m => m.party === p).length;
-      const isOurs = ourSideName
-        ? p === ourSideName
-        : templateName && p.toLowerCase().includes(templateName.toLowerCase().slice(0, 6));
-      return `<div class="party-row">
-        <span style="color:${isOurs ? "var(--c-accent)" : "var(--c-muted)"}">
-          ${isOurs ? "▶" : "·"}
-        </span>
-        <span>${p}</span>
-        <span style="font-size:12px;color:var(--c-muted)">${cnt} ${cnt === 1 ? "место" : "места/мест"}</span>
-        ${isOurs ? '<span class="party-badge">наша сторона</span>' : ""}
-      </div>`;
-    }).join("");
-    partiesEl.innerHTML = `
-      <div style="font-size:12px;color:var(--c-muted);margin-bottom:0.4rem">Стороны в документе:</div>
-      ${rows}
-      <div style="height:1px;background:var(--c-border);margin:0.75rem 0"></div>`;
-  } else {
-    partiesEl.innerHTML = "";
+  if (sideEl) {
+    sideEl.innerHTML = displayName
+      ? `<div style="font-size:14px;margin-bottom:0.4rem">
+           Наша сторона: <strong>${displayName}</strong>${alias ? `, алиас: <strong>${alias}</strong>` : ''}
+         </div>`
+      : `<div style="font-size:14px;color:var(--c-muted);margin-bottom:0.4rem">Сторона не распознана</div>`;
   }
 
-  // Anchor count + sign button
   const n = _workAnchors.length;
   document.getElementById("work-anchor-info").textContent =
     n > 0 ? `Мест для подписи: ${n}` : "Мест для подписи не найдено.";
