@@ -795,7 +795,7 @@ async function initWorkTab() {
 
   // Restore document state if returning to work tab
   if (_signedBlob) {
-    showPdfPreview(_signedBlob, _firstSignedPageNum(), "Подписанный документ");
+    showPdfPreview(_signedBlob, _firstSignedPageNum(), _buildPreviewLabel(_workAnalyzeResult, _workFile.name));
     _updateToolbarActions();
     if (_workAnchors) {
       document.getElementById("work-result-card").style.display = "block";
@@ -804,7 +804,7 @@ async function initWorkTab() {
   } else if (_workFile) {
     // _workFile is always a PDF here — handleWorkFile converts DOC/DOCX
     // to PDF via /v1/me/convert before storing it.
-    showPdfPreview(_workFile, 1, "Исходный документ");
+    showPdfPreview(_workFile, 1, _buildPreviewLabel(_workAnalyzeResult, _workFile.name));
     _updateToolbarActions();
     if (_workAnchors) {
       document.getElementById("work-result-card").style.display = "block";
@@ -841,6 +841,34 @@ async function loadWorkUsage() {
 }
 
 // ── PDF preview panel ─────────────────────────────────────────────────────
+
+// Fix-11: preview header shows filename + whether this run was a fresh LLM
+// pass or a reapplied remembered template — visual diagnostic without DevTools.
+function _truncateFilename(name, maxLen = 30) {
+  if (!name) return '';
+  if (name.length <= maxLen) return name;
+  const extMatch = name.match(/\.[^.]+$/);
+  const ext = extMatch ? extMatch[0] : '';
+  const base = ext ? name.slice(0, -ext.length) : name;
+  const keep = maxLen - ext.length - 1; // -1 под символ "…"
+  if (keep <= 0) return name.slice(0, maxLen) + '…';
+  return base.slice(0, keep) + '…' + ext;
+}
+
+function _buildPreviewLabel(analyzeResult, filename) {
+  const fname = _truncateFilename(filename, 30);
+  if (analyzeResult && analyzeResult.from_template) {
+    const tplName = analyzeResult.template_name
+      ? _truncateFilename(analyzeResult.template_name, 24)
+      : (analyzeResult.template_id || '').slice(0, 8);
+    return `${fname} · Применён шаблон: ${tplName}`;
+  }
+  if (analyzeResult) {
+    return `${fname} · Распознано`;
+  }
+  return fname;  // до завершения анализа — просто имя файла
+}
+
 async function showPdfPreview(pdfBlobOrFile, pageNumber, label) {
   const scrollEl = document.getElementById('pdf-canvas-scroll');
   const empty    = document.getElementById('pdf-preview-empty');
@@ -1004,9 +1032,9 @@ async function handleWorkFile(file) {
     }
     const baseName = file.name.replace(/\.[^.]+$/, "");
     _workFile = new File([pdfBlob], baseName + ".pdf", { type: "application/pdf" });
-    showPdfPreview(_workFile, 1, "Исходный документ");
+    showPdfPreview(_workFile, 1, _buildPreviewLabel(null, _workFile.name));
   } else {
-    showPdfPreview(file, 1, "Исходный документ");
+    showPdfPreview(file, 1, _buildPreviewLabel(null, _workFile.name));
   }
 
   showWorkSpinner("Анализируем документ...");
@@ -1037,6 +1065,12 @@ async function handleWorkFile(file) {
   _workAnchors = result.anchors || [];
   _workAnalyzeResult = result;
   _rememberedTemplateId = result.from_template ? (result.template_id || null) : null;
+  // Fix-11: signing (below) re-renders the preview with its own label anyway —
+  // this covers the case where it doesn't run (no anchors / signature not
+  // ready yet) and the preview stays on the original, so the header still
+  // reflects the just-completed analysis instead of the pre-analyze filename.
+  const lblEl = document.getElementById('pdf-preview-label');
+  if (lblEl) lblEl.textContent = _buildPreviewLabel(_workAnalyzeResult, _workFile.name);
   renderAnalysisResult(result);
   _updateToolbarActions();
 
@@ -1182,7 +1216,7 @@ async function workSign() {
   _signedFilename = "signed_" + baseName + ".pdf";
   _signedBlob = blob;
 
-  showPdfPreview(blob, _firstSignedPageNum(), "Подписанный документ");
+  showPdfPreview(blob, _firstSignedPageNum(), _buildPreviewLabel(_workAnalyzeResult, _workFile.name));
   _updateToolbarActions();
 
   if (window.posthog) posthog.capture("document_signed");
