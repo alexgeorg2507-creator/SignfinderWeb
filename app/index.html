@@ -1274,7 +1274,7 @@ window.toggleRememberTemplate = async function() {
       const manualAsAnchors = _manualAnchors.map(m => ({
         id: `manual_${m.page}_${Math.round(m.x)}_${Math.round(m.y)}`,
         anchor_level: 1,
-        anchor_text: '',
+        anchor_text: m.anchor_text || '',
         position: 'on',
         generated_pattern: '',
         bbox: [m.x, m.y, m.x + m.width, m.y + m.height],
@@ -1284,6 +1284,13 @@ window.toggleRememberTemplate = async function() {
         // exactly (no text search) when the remembered template matches again.
         added_by: 'manual_click',
         page_hint: String(m.page - 1),  // TextAnchor page_hint is 0-indexed; m.page is 1-indexed
+        // Fix-12: смещение от текста-ориентира — для устойчивого повторного
+        // применения (переживает небольшой реflow документа). context_before
+        // переиспользуется как контейнер, т.к. для manual_click оно иначе не
+        // используется (apply_template_anchors проверяет его только в regex-ветке).
+        context_before: m.anchor_bbox ? JSON.stringify({
+          anchor_bbox: m.anchor_bbox, offset_dx: m.offset_dx, offset_dy: m.offset_dy,
+        }) : '',
       }));
       const body = {
         fingerprint: fp,
@@ -1454,13 +1461,33 @@ async function _confirmPlacer() {
   const scale = canvas._pdfScale || 1;
   const topLeftPdf = canvasToPdfCoords(left, top, canvas);
   const pageNum = parseInt(wrap.dataset.pageNum, 10);
+  const widthPt = w / scale, heightPt = h / scale;
+
+  // Fix-12: определить текст-ориентир и смещение для устойчивой повторной
+  // простановки через шаблон (переживает небольшой реflow документа)
+  let anchorProbe = { anchor_text: '', anchor_bbox: null, offset_dx: 0, offset_dy: 0 };
+  try {
+    const fd = new FormData();
+    fd.append('file', _workFile);
+    fd.append('page', pageNum);
+    fd.append('x', topLeftPdf.x);
+    fd.append('y', topLeftPdf.y);
+    fd.append('width', widthPt);
+    fd.append('height', heightPt);
+    const res = await apiFetch('/v1/me/manual-anchor/probe', { method: 'POST', body: fd });
+    if (res.ok) anchorProbe = await res.json();
+  } catch { /* probe необязателен — при неудаче просто нет текстовой привязки */ }
 
   _manualAnchors.push({
     page: pageNum,
     x: topLeftPdf.x,
     y: topLeftPdf.y,
-    width: w / scale,
-    height: h / scale,
+    width: widthPt,
+    height: heightPt,
+    anchor_text: anchorProbe.anchor_text || '',
+    anchor_bbox: anchorProbe.anchor_bbox || null,
+    offset_dx: anchorProbe.offset_dx || 0,
+    offset_dy: anchorProbe.offset_dy || 0,
   });
 
   el.remove();
