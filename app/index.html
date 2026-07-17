@@ -1137,7 +1137,7 @@ function _anchorSurvivesExclude(a) {
   return Number.isNaN(n) ? true : !_excludePages.includes(n + 1);
 }
 
-async function workSign() {
+async function workSign(preservePosition = false) {
   if (!_workFile) return;
   const surviving = (_workAnchors || []).filter(_anchorSurvivesExclude);
   const hasAnchors = surviving.length || _manualAnchors.length;
@@ -1191,7 +1191,11 @@ async function workSign() {
   _signedFilename = "signed_" + baseName + ".pdf";
   _signedBlob = blob;
 
-  showPdfPreview(blob, _firstSignedPageNum(), _buildPreviewLabel(_workAnalyzeResult, _workFile.name));
+  // Fix-17: сохранить текущую позицию просмотра при пересборке после ручного
+  // редактирования (стереть/добавить подпись) — прыжок на "первую страницу с
+  // подписью" уместен только при самом первом авто-подписании после загрузки.
+  const targetPage = preservePosition ? (_currentVisiblePage || 1) : _firstSignedPageNum();
+  showPdfPreview(blob, targetPage, _buildPreviewLabel(_workAnalyzeResult, _workFile.name));
   _updateToolbarActions();
 
   if (window.posthog) posthog.capture("document_signed");
@@ -1227,6 +1231,43 @@ function _updateToolbarActions() {
   _updateRememberButton();
 }
 
+// Fix-10.1: remember the same set workSign() actually stamped — surviving
+// auto/template anchors (minus excluded pages) plus manual placements — not
+// the raw untouched analyze() output. Вынесено в отдельную функцию (Fix-17)
+// — переиспользуется и ручным "Запомнить", и авто-пересохранением после
+// правок при уже активном флаге.
+function _buildRememberBody() {
+  const fp = (_workAnalyzeResult && _workAnalyzeResult.fingerprint) || {};
+  const survivingAuto = (_workAnchors || []).filter(_anchorSurvivesExclude);
+  const manualAsAnchors = _manualAnchors.map(m => ({
+    id: `manual_${m.page}_${Math.round(m.x)}_${Math.round(m.y)}`,
+    anchor_level: 1,
+    anchor_text: m.anchor_text || '',
+    position: 'on',
+    generated_pattern: '',
+    bbox: [m.x, m.y, m.x + m.width, m.y + m.height],
+    // TextAnchor.added_by is a two-value enum: "auto_regex" | "manual_click"
+    // (signfinder-core/anchors/models.py) — "manual_click" is the established
+    // provenance apply_template_anchors() checks for to reapply this bbox
+    // exactly (no text search) when the remembered template matches again.
+    added_by: 'manual_click',
+    page_hint: String(m.page - 1),  // TextAnchor page_hint is 0-indexed; m.page is 1-indexed
+    // Fix-12: смещение от текста-ориентира — для устойчивого повторного
+    // применения (переживает небольшой реflow документа). context_before
+    // переиспользуется как контейнер, т.к. для manual_click оно иначе не
+    // используется (apply_template_anchors проверяет его только в regex-ветке).
+    context_before: m.anchor_bbox ? JSON.stringify({
+      anchor_bbox: m.anchor_bbox, offset_dx: m.offset_dx, offset_dy: m.offset_dy,
+    }) : '',
+  }));
+  return {
+    fingerprint: fp,
+    anchors: [...survivingAuto, ...manualAsAnchors],
+    language: fp.language || 'ru',
+    synonyms_used: (_workAnalyzeResult && _workAnalyzeResult.synonyms_used) || {},
+  };
+}
+
 window.toggleRememberTemplate = async function() {
   if (!_workAnalyzeResult) return;
   const btn = document.getElementById('btn-remember');
@@ -1241,39 +1282,7 @@ window.toggleRememberTemplate = async function() {
         showWorkMsg('Не удалось забыть шаблон', 'error');
       }
     } else {
-      const fp = (_workAnalyzeResult && _workAnalyzeResult.fingerprint) || {};
-      // Fix-10.1: remember the same set workSign() actually stamped — surviving
-      // auto/template anchors (minus excluded pages) plus manual placements —
-      // not the raw untouched analyze() output.
-      const survivingAuto = (_workAnchors || []).filter(_anchorSurvivesExclude);
-      const manualAsAnchors = _manualAnchors.map(m => ({
-        id: `manual_${m.page}_${Math.round(m.x)}_${Math.round(m.y)}`,
-        anchor_level: 1,
-        anchor_text: m.anchor_text || '',
-        position: 'on',
-        generated_pattern: '',
-        bbox: [m.x, m.y, m.x + m.width, m.y + m.height],
-        // TextAnchor.added_by is a two-value enum: "auto_regex" | "manual_click"
-        // (signfinder-core/anchors/models.py) — "manual_click" is the established
-        // provenance apply_template_anchors() checks for to reapply this bbox
-        // exactly (no text search) when the remembered template matches again.
-        added_by: 'manual_click',
-        page_hint: String(m.page - 1),  // TextAnchor page_hint is 0-indexed; m.page is 1-indexed
-        // Fix-12: смещение от текста-ориентира — для устойчивого повторного
-        // применения (переживает небольшой реflow документа). context_before
-        // переиспользуется как контейнер, т.к. для manual_click оно иначе не
-        // используется (apply_template_anchors проверяет его только в regex-ветке).
-        context_before: m.anchor_bbox ? JSON.stringify({
-          anchor_bbox: m.anchor_bbox, offset_dx: m.offset_dx, offset_dy: m.offset_dy,
-        }) : '',
-      }));
-      const body = {
-        fingerprint: fp,
-        anchors: [...survivingAuto, ...manualAsAnchors],
-        language: fp.language || 'ru',
-        synonyms_used: (_workAnalyzeResult && _workAnalyzeResult.synonyms_used) || {},
-      };
-      const res = await apiFetch('/v1/me/templates/remember', { method: 'POST', body: JSON.stringify(body) });
+      const res = await apiFetch('/v1/me/templates/remember', { method: 'POST', body: JSON.stringify(_buildRememberBody()) });
       if (res.ok) {
         const data = await res.json();
         _rememberedTemplateId = data.template_id;
@@ -1288,6 +1297,31 @@ window.toggleRememberTemplate = async function() {
   if (btn) btn.disabled = false;
   _updateRememberButton();
 };
+
+// Fix-17: если шаблон уже запомнен и пользователь стирает/добавляет подпись
+// вручную — обновить сохранённый шаблон автоматически, без повторного
+// нажатия "Забыть" + "Запомнить". У /v1/me/templates/remember нет режима
+// обновления на месте (всегда создаёт новый template_id) — обновление
+// делаем как забыть старый + запомнить заново, прозрачно для пользователя.
+async function _autoResaveRememberedTemplate() {
+  if (!_rememberedTemplateId || !_workAnalyzeResult) return;
+  const oldId = _rememberedTemplateId;
+  try {
+    await apiFetch(`/v1/me/templates/${oldId}`, { method: 'DELETE' });
+    const res = await apiFetch('/v1/me/templates/remember', { method: 'POST', body: JSON.stringify(_buildRememberBody()) });
+    if (res.ok) {
+      const data = await res.json();
+      _rememberedTemplateId = data.template_id;
+    } else {
+      _rememberedTemplateId = null;
+      showWorkMsg('Не удалось обновить сохранённый шаблон — запомните заново', 'error');
+    }
+  } catch {
+    _rememberedTemplateId = null;
+    showWorkMsg('Не удалось обновить сохранённый шаблон — запомните заново', 'error');
+  }
+  _updateRememberButton();
+}
 
 // canvas CSS-pixel offset → PDF points. fitz/PyMuPDF (signfinder-core) uses a
 // top-left-origin, Y-down coordinate system — same orientation as <canvas> —
@@ -1473,7 +1507,8 @@ async function _confirmPlacer() {
   _detachPlacementClickHandlers();
 
   showWorkSpinner('Подписываем...');
-  await workSign();
+  await workSign(true);
+  await _autoResaveRememberedTemplate();
   hideWorkSpinner();
 }
 
@@ -1517,7 +1552,8 @@ window.eraseCurrentPageSignature = async function() {
     _excludePages.push(page);
   }
   showWorkSpinner('Обновляем...');
-  await workSign();
+  await workSign(true);
+  await _autoResaveRememberedTemplate();
   hideWorkSpinner();
 };
 
