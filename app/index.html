@@ -59,6 +59,26 @@
   .topbar-user { display: flex; align-items: center; gap: 0.75rem; font-size: 14px; color: var(--c-muted); }
   .btn-logout { font-size: 13px; color: var(--c-muted); background: none; border: 1px solid var(--c-border); border-radius: 8px; padding: 0.35rem 0.75rem; cursor: pointer; font-family: inherit; }
   .btn-logout:hover { background: var(--c-bg); }
+  /* Fix-21: гамбургер + выпадающее меню вместо нижнего sticky-меню — тот же
+     класс бага (базовое правило после media-запроса) уже один раз тихо
+     сломал нижнее меню незаметно для глаза; топбар всегда виден и не
+     зависит от position:sticky/safe-area на дне экрана, поэтому надёжнее. */
+  .hamburger-btn { display: none; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border: 1px solid var(--c-border); border-radius: 8px;
+    background: var(--c-surface); cursor: pointer; color: var(--c-text); flex-shrink: 0; }
+  .hamburger-btn svg { width: 18px; height: 18px; display: block; }
+  .mobile-dropdown { display: none; position: fixed; top: 64px; right: 1rem;
+    background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 10px;
+    box-shadow: var(--shadow); z-index: 20; overflow: hidden; min-width: 190px; }
+  .mobile-dropdown.open { display: block; }
+  .mobile-dropdown-item { display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.75rem 1rem; font-size: 14px; cursor: pointer; color: var(--c-text); }
+  .mobile-dropdown-item:hover { background: var(--c-bg); }
+  .mobile-dropdown-item.active { color: var(--c-accent); background: var(--c-accent-bg); }
+  @media (max-width: 600px) {
+    .hamburger-btn { display: flex; }
+    #topbar-email { display: none; }
+  }
   .cabinet-layout { display: flex; flex: 1; min-height: 0; }
   .sidebar { width: 220px; border-right: 1px solid var(--c-border); background: var(--c-surface); padding: 1rem 0; flex-shrink: 0; }
   .nav-item { display: flex; align-items: center; gap: 0.65rem; padding: 0.65rem 1.25rem; font-size: 14px; cursor: pointer; color: var(--c-muted); border-left: 3px solid transparent; transition: all .15s; }
@@ -176,19 +196,20 @@
   .sig-placer-cancel { background: var(--c-danger); color: #fff; }
 
   /* ── responsive ── */
-  /* Fix-18: базовое правило .mobile-nav ДОЛЖНО идти раньше media-запроса —
-     при равной специфичности в CSS побеждает то, что позже в исходнике,
-     независимо от того, внутри media query оно или нет. Раньше display:none
-     здесь стоял ПОСЛЕ @media(max-width:600px){display:flex} и всегда
-     перебивал его — меню было невидимо на любой ширине, включая iPhone. */
-  .mobile-nav { display: none; position: sticky; bottom: 0; background: var(--c-surface); border-top: 1px solid var(--c-border); z-index: 10; padding-bottom: env(safe-area-inset-bottom, 0); }
-  .mobile-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0.6rem 0.25rem; font-size: 11px; cursor: pointer; color: var(--c-muted); gap: 2px; }
-  .mobile-nav-item.active { color: var(--c-accent); }
-  .mobile-nav-icon { font-size: 20px; }
+  /* Fix-21: нижнее sticky-меню (.mobile-nav) убрано — заменено гамбургером
+     в топбаре (см. .hamburger-btn/.mobile-dropdown выше). Причина замены,
+     не просто ещё одна правка: Fix-18 починил реальный CSS-баг (базовое
+     правило после media-запроса всегда побеждало) и это было ПОДТВЕРЖДЕНО
+     через getComputedStyle, но на living iPhone меню всё равно было не
+     видно — либо кэш Firebase Hosting (Cache-Control: max-age=3600) отдал
+     старую версию, либо position:sticky снизу экрана по-своему
+     взаимодействует с iOS Safari (сворачивающийся тулбар браузера меняет
+     реальную высоту вьюпорта). Топбар уже наверху, всегда виден и не
+     зависит ни от того, ни от другого — надёжнее по конструкции, а не
+     просто "ещё одна попытка".*/
   @media (max-width: 600px) {
     .sidebar { display: none; }
-    .main-content { padding: 1rem; padding-bottom: 5rem; }
-    .mobile-nav { display: flex; }
+    .main-content { padding: 1rem; }
   }
 </style>
 <script type="module">
@@ -252,6 +273,21 @@
     <div class="topbar-user">
       <span id="topbar-email"></span>
       <button class="btn-logout" onclick="signOut()">Выйти</button>
+      <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileMenu(event)" aria-label="Меню" title="Меню">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Fix-21: гамбургер-меню на узких экранах — надёжнее прежнего нижнего
+       sticky-меню (топбар всегда наверху, не зависит от position:sticky +
+       безопасной зоны снизу экрана на iOS) -->
+  <div class="mobile-dropdown" id="mobile-dropdown">
+    <div class="mobile-dropdown-item active" onclick="showTab('profile')" id="mdrop-profile">
+      <span>👤</span> Профиль
+    </div>
+    <div class="mobile-dropdown-item" onclick="showTab('work')" id="mdrop-work">
+      <span>📄</span> Подписать договор
     </div>
   </div>
 
@@ -268,16 +304,6 @@
     <main class="main-content" id="main-content">
       <!-- injected by showTab() -->
     </main>
-  </div>
-
-  <!-- Mobile nav -->
-  <div class="mobile-nav">
-    <div class="mobile-nav-item active" onclick="showTab('profile')" id="mnav-profile">
-      <span class="mobile-nav-icon">👤</span>Профиль
-    </div>
-    <div class="mobile-nav-item" onclick="showTab('work')" id="mnav-work">
-      <span class="mobile-nav-icon">📄</span>Договор
-    </div>
   </div>
 </div>
 
@@ -533,11 +559,12 @@ const TABS = {
 window.showTab = (tab) => {
   _processedSigB64 = null;
   // _workFile, _workAnchors, _signedBlob, _signedFilename persist across tabs
-  document.querySelectorAll(".nav-item, .mobile-nav-item").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".nav-item, .mobile-dropdown-item").forEach(el => el.classList.remove("active"));
   const navEl = document.getElementById("nav-" + tab);
-  const mnavEl = document.getElementById("mnav-" + tab);
+  const mdropEl = document.getElementById("mdrop-" + tab);
   if (navEl) navEl.classList.add("active");
-  if (mnavEl) mnavEl.classList.add("active");
+  if (mdropEl) mdropEl.classList.add("active");
+  closeMobileMenu();
   const mainEl = document.getElementById("main-content");
   mainEl.innerHTML = TABS[tab] || "";
   mainEl.classList.toggle("wide", tab === "work");
@@ -545,6 +572,24 @@ window.showTab = (tab) => {
   if (tab === "party")     { loadParty(); }
   if (tab === "work")      { initWorkTab(); }
 };
+
+// Fix-21: гамбургер-меню — открыть/закрыть + закрытие по клику вовне
+function closeMobileMenu() {
+  const dd = document.getElementById('mobile-dropdown');
+  if (dd) dd.classList.remove('open');
+}
+window.toggleMobileMenu = (ev) => {
+  if (ev) ev.stopPropagation();
+  const dd = document.getElementById('mobile-dropdown');
+  if (dd) dd.classList.toggle('open');
+};
+document.addEventListener('click', (ev) => {
+  const dd = document.getElementById('mobile-dropdown');
+  const btn = document.getElementById('hamburger-btn');
+  if (!dd || !dd.classList.contains('open')) return;
+  if (dd.contains(ev.target) || (btn && btn.contains(ev.target))) return;
+  closeMobileMenu();
+});
 
 // ── API helper ─────────────────────────────────────────────────────────────
 async function apiFetch(path, opts = {}) {
