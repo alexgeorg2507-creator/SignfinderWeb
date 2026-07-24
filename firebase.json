@@ -6,6 +6,9 @@
       ".firebaserc",
       "*.md",
       "**/.*",
+      "**/.git/**",
+      "**/.github/**",
+      "**/.firebase/**",
       "TASK_*",
       "index-cloud.html"
     ],
