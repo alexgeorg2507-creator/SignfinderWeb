@@ -102,10 +102,67 @@ pytest tests/ -v
 
 ---
 
+## v2.0.0 Deal Cycle — тесты (планируются в E1-E2, покрытие ~15 тестов)
+
+> Все тесты добавляются в `signfinder-api/tests/` вместе с реализацией
+> эпика. Полная спека — `DEAL_CYCLE_SPEC.md`.
+
+### `test_deals_crud.py` — CRUD сделки (в E1, 4 теста)
+
+| Тест | Что проверяет | Ожидаемый результат |
+|------|---------------|---------------------|
+| `test_create_deal_from_signed_pdf` | POST `/v1/deals` с подписанным инициатором PDF | 201, deal_id, share_token, status=`draft`, expires_at через 7 дней |
+| `test_list_deals_own_only` | USER_A создал сделку → USER_B `GET /v1/deals` не видит её (IDOR) | B: пустой список |
+| `test_get_deal_details_own_only` | USER_A создал → USER_B пытается `GET /v1/deals/{A_deal_id}` | 404 (не 403 — не раскрываем факт существования) |
+| `test_mark_shared_updates_status` | POST `/v1/deals/{id}/mark-shared` с channel=`whatsapp` → GET показывает status=`sent`, share_channel_used=`whatsapp`, audit_log содержит `sent` | 200, статус обновлён |
+
+### `test_deals_public.py` — публичная страница (в E2, 5 тестов)
+
+| Тест | Что проверяет | Ожидаемый результат |
+|------|---------------|---------------------|
+| `test_get_public_deal_by_token_no_auth` | GET `/v1/public/deals/{share_token}` без Authorization header | 200, метаданные без initiator_tenant_id и полного email |
+| `test_get_public_deal_invalid_token_404` | GET с невалидным токеном | 404 (не 403) |
+| `test_viewed_status_on_first_get` | Первый GET публичной страницы → status → `viewed`, audit_log содержит IP и UA | 200 |
+| `test_sign_without_consent_checkbox_422` | POST `/sign` без чекбокса ПЭП | 422 |
+| `test_sign_valid_updates_status_and_creates_final_pdf` | POST `/sign` с подписью → status=`signed`, final_pdf_path заполнен, юр. блок в PDF | 200 |
+
+### `test_deals_public_ratelimit.py` — rate limits (в E2, 2 теста)
+
+| Тест | Что проверяет | Ожидаемый результат |
+|------|---------------|---------------------|
+| `test_share_token_ratelimit_10_per_min` | 11 GET подряд на один share_token | 11-й: 429 |
+| `test_ip_ratelimit_60_per_min` | 61 запрос с одного IP на разные токены | 61-й: 429 |
+
+### `test_deals_expired.py` — ретенция (в E5, 2 теста)
+
+| Тест | Что проверяет | Ожидаемый результат |
+|------|---------------|---------------------|
+| `test_cron_marks_expired_and_deletes_pdf` | Синтетический deal с expires_at=`now()-1h` → запуск cron → status=`expired`, storage путей нет | 200 |
+| `test_expired_deal_returns_410` | GET публичной страницы на expired deal | 410 Gone (или 404, обсуждаемо) |
+
+### `test_deals_no_email.py` — критерий готовности №11 (в E7, 1 тест)
+
+| Тест | Что проверяет | Ожидаемый результат |
+|------|---------------|---------------------|
+| `test_no_smtp_imports_anywhere` | grep по `signfinder-api/app/` на `import smtplib`, `from email.` и подобное | 0 совпадений (кроме tests/) |
+
+### `test_feedback.py` — опросник в TG (в E6, 1 тест)
+
+| Тест | Что проверяет | Ожидаемый результат |
+|------|---------------|---------------------|
+| `test_feedback_sends_to_telegram_bot_mocked` | POST `/v1/feedback` с моком `requests.post` к api.telegram.org | 200, mock вызван ровно 1 раз с правильным body |
+
+---
+
 ## Что НЕ покрыто (следующая итерация)
 
-- `signfinder-core` unit-тесты (fingerprint, matcher, overlay) — roadmap v1.15, не сделано
+- `signfinder-core` unit-тесты в `signfinder-api/tests/` — само ядро
+  покрыто на своей стороне (см. `signfinder-core/tests/`, 156 passed на
+  v1.20.18), но интеграционных тестов «API-эндпоинт → core-функция»
+  минимум, только smoke через мок
 - `/v1/me/analyze` happy path (нужен реальный PDF + мок LLM с валидным ответом)
 - `/v1/me/sign` happy path
 - Тесты на `signfinder-prod` (smoke only через GitHub Actions deploy-prod.yml)
-- Rate limiting / повторные запросы
+- Rate limiting для приватных эндпоинтов (для публичных Deal Cycle — покрыто в v2.0.0)
+- E2E-тест «инициатор подписал → передал ссылку → контрагент подписал
+  → оба скачали» — на Playwright, не сделано, кандидат в v2.1

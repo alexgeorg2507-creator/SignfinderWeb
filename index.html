@@ -112,7 +112,7 @@
   <div class="wrap nav">
     <div class="logo">SignFinder<span class="dot">.</span></div>
     <div style="display:flex;align-items:center;gap:16px;">
-      <a href="/enterprise" style="font-size:14px;color:var(--muted);font-weight:500;white-space:nowrap;" data-i="nav_ent">Для бизнеса →</a>
+      <a href="/enterprise" id="nav-ent-link" style="font-size:14px;color:var(--muted);font-weight:500;white-space:nowrap;" data-i="nav_ent">Для бизнеса →</a>
       <div class="nav-lang">
         <button class="active" data-lang="ru" onclick="setLang('ru')">RU</button>
         <button data-lang="en" onclick="setLang('en')">EN</button>
@@ -149,8 +149,8 @@
     <div class="highlight-block">
       <div class="big-ico">🛟</div>
       <div>
-        <h3 data-i="hl_t">Как юрист, которого у вас нет</h3>
-        <p data-i="hl_p1">Нет своего юриста? SignFinder читает договор перед подписанием и подсказывает: не указан срок, забыли порядок оплаты, нет реквизитов.</p>
+        <h3 data-i="hl_t">Нет своего юриста?</h3>
+        <p data-i="hl_p1">SignFinder читает договор перед подписанием и подсказывает: не указан срок, забыли порядок оплаты, нет реквизитов.</p>
         <p data-i="hl_p2">Подписываете спокойно — зная, что не упустили важное.</p>
       </div>
     </div>
@@ -201,30 +201,19 @@
   </div>
 </section>
 
-<section>
-  <div class="wrap">
-    <div class="price-hint">
-      <div class="big" data-i="price_big">Начните бесплатно</div>
-      <p data-i="price_p">Первые договоры — бесплатно. Платите, только когда подписываете много. Без карты на старте.</p>
-    </div>
-  </div>
-</section>
-
 <footer>
   <div class="wrap">
     <div class="logo" style="font-size:18px; margin-bottom:8px;">SignFinder<span class="dot">.</span></div>
     <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;">
       <span style="color:var(--muted);font-size:14px;font-weight:600;">Contacts:</span>
-      <a href="https://t.me/SingFinder" target="_blank" style="display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:14px;text-decoration:none;">
+      <a href="https://t.me/SingFinder" target="_blank" aria-label="Telegram" style="display:inline-flex;align-items:center;color:var(--muted);text-decoration:none;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
-        @SignFinder
       </a>
-      <a href="mailto:alexgeorg2507@gmail.com" style="display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:14px;text-decoration:none;">
+      <a href="mailto:alexgeorg2507@gmail.com" aria-label="Email" style="display:inline-flex;align-items:center;color:var(--muted);text-decoration:none;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8l10 6 10-6"/></svg>
-        alexgeorg2507@gmail.com
       </a>
     </div>
-    <div data-i="footer">© 2026 SignFinder · Демо-версия</div>
+    <div data-i="footer">© 2026 SignFinder</div>
   </div>
 </footer>
 
@@ -240,8 +229,8 @@ const I18N = {
     s1t: "Загрузите", s1p: "Перетащите PDF или Word-файл договора в окно.",
     s2t: "Проверьте", s2p: "SignFinder найдёт места подписи и подскажет, если в договоре что-то упущено.",
     s3t: "Скачайте", s3p: "Готовый подписанный PDF — отправляйте клиенту.",
-    hl_t: "Как юрист, которого у вас нет",
-    hl_p1: "Нет своего юриста? SignFinder читает договор перед подписанием и подсказывает: не указан срок, забыли порядок оплаты, нет реквизитов.",
+    hl_t: "Нет своего юриста?",
+    hl_p1: "SignFinder читает договор перед подписанием и подсказывает: не указан срок, забыли порядок оплаты, нет реквизитов.",
     hl_p2: "Подписываете спокойно — зная, что не упустили важное.",
     who_t: "Для тех, кто работает на себя", who_l: "Договор на каждую сделку — а юриста на зарплате нет.",
     w1t: "Ремонт и строймастера", w1p: "Договор на работы с каждым заказчиком.",
@@ -260,9 +249,7 @@ const I18N = {
     uz_privacy: "Документ не сохраняется и удаляется сразу после обработки",
     disc_t: "Важно:",
     disc_p: "SignFinder ставит изображение вашей подписи (факсимиле), а не электронную цифровую подпись. Факсимиле действительно при письменном согласии сторон — для большинства договоров услуг этого достаточно.",
-    price_big: "Начните бесплатно",
-    price_p: "Первые договоры — бесплатно. Платите, только когда подписываете много. Без карты на старте.",
-    footer: "© 2026 SignFinder · Демо-версия",
+    footer: "© 2026 SignFinder",
     nav_ent: "Для бизнеса →",
   },
   en: {
@@ -275,8 +262,8 @@ const I18N = {
     s1t: "Upload", s1p: "Drop a PDF or Word file of your contract.",
     s2t: "Check", s2p: "SignFinder finds signature spots and flags anything missing in the contract.",
     s3t: "Download", s3p: "A ready signed PDF — send it to your client.",
-    hl_t: "Like the lawyer you don't have",
-    hl_p1: "No lawyer of your own? SignFinder reads the contract before signing and points out: missing term, forgotten payment order, no details.",
+    hl_t: "No lawyer of your own?",
+    hl_p1: "SignFinder reads the contract before signing and points out: missing term, forgotten payment order, no details.",
     hl_p2: "Sign with confidence — knowing you didn't miss anything important.",
     who_t: "For people who work for themselves", who_l: "A contract for every deal — but no lawyer on payroll.",
     w1t: "Repair & trades", w1p: "A work contract with every client.",
@@ -295,9 +282,7 @@ const I18N = {
     uz_privacy: "The document is not stored and is deleted immediately after processing",
     disc_t: "Note:",
     disc_p: "SignFinder places an image of your signature (facsimile), not a qualified electronic signature. A facsimile is valid with written consent of both parties — enough for most service contracts.",
-    price_big: "Start free",
-    price_p: "First contracts free. Pay only when you sign a lot. No card to start.",
-    footer: "© 2026 SignFinder · Demo",
+    footer: "© 2026 SignFinder",
     nav_ent: "For business →",
   }
 };
@@ -306,6 +291,8 @@ function setLang(l) {
   document.querySelectorAll(".nav-lang button").forEach(b => b.classList.toggle("active", b.dataset.lang === l));
   document.querySelectorAll("[data-i]").forEach(el => { const k = el.dataset.i; if (I18N[l][k] !== undefined) el.innerHTML = I18N[l][k]; });
   document.documentElement.lang = l;
+  const navEnt = document.getElementById('nav-ent-link');
+  if (navEnt) navEnt.href = '/' + l + '/enterprise';
   // Обновляем src iframe с параметром языка — надёжнее postMessage
   document.querySelectorAll("iframe").forEach(fr => {
     const want = "hero.html?lang=" + l;

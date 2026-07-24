@@ -26,7 +26,19 @@
 |----|-------|------|------------|
 | Cloud Run runtime | `signfinder-api@signfinder-prod.iam.gserviceaccount.com` | `cloudsql.client`, `secretmanager.secretAccessor`, `storage.objectAdmin` | Рантайм API на prod |
 | Cloud Build default | `449403012307@cloudbuild.gserviceaccount.com` | `cloudbuild.builds.builder`, `run.admin`, `editor` | Сборка и деплой |
-| GitHub Actions | `github-actions@signfinder-prod.iam.gserviceaccount.com` | `cloudbuild.builds.editor`, `storage.admin` (project-level), `iam.serviceAccountUser` on compute SA, `run.developer`, `firebasehosting.admin` | CI/CD из GitHub Actions (API деплой + Firebase Hosting деплой) |
+| GitHub Actions | `github-actions@signfinder-prod.iam.gserviceaccount.com` | `cloudbuild.builds.editor`, `storage.admin`, `iam.serviceAccountUser` on compute SA, `run.developer`, `run.viewer`, `firebasehosting.admin`, `logging.viewer`, `secretmanager.secretAccessor`, `cloudsql.client`, `serviceusage.serviceUsageConsumer` | CI/CD из GitHub Actions (API деплой + Firebase Hosting деплой) |
+
+⚠️ **Инцидент 2026-07-06:** этот SA полностью отсутствовал в `signfinder-prod`
+(`gcloud iam service-accounts list` его не показывал). Причина не установлена —
+не удаляли намеренно, возможно ошибочная очистка вручную или через gcloud/console.
+Пересоздан с нуля со всеми ролями выше. Новый ключ разослан в оба репо
+(`signfinder-api`, `SignfinderWeb`) — старые ключи этого SA больше не валидны, так
+как SA был пересоздан заново (новый unique ID, старые ключи не работают
+даже если email совпадает).
+
+**Урок:** при любом странном поведении CI/CD ("secret вроде тот же, но не работает") —
+первая проверка: `gcloud iam service-accounts list --project=<project>`, убедиться что SA
+вообще существует, до того как пересоздавать ключи.
 
 **Ключи SA:** у SA может быть несколько активных ключей одновременно.
 `signfinder-api` и `SignfinderWeb` используют разные JSON-ключи одного SA.
