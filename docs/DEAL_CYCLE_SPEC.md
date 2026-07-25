@@ -40,6 +40,8 @@
 компромисс MVP; альтернатива (собственный email-канал уведомлений) хуже
 описанных выше причин.
 
+Полное обоснование — ADR-010.
+
 ---
 
 ## 1. Позиционирование
@@ -121,7 +123,17 @@ PDF».
 6. Нажимает «Подписать»
 7. Видит финальный PDF, кнопку «Скачать финальный PDF»
 8. Сохраняет себе на устройство. Пока сделка активна (до 7 дней) — может вернуться
-   по той же ссылке и скачать снова
+   по той же ссылке и:
+   - Видеть финальный PDF в viewer
+   - Скачать ещё раз (сколько угодно раз)
+   - Никаких ограничений на просмотр после подписания
+
+**Что происходит после подписания на публичной странице:**
+
+Страница обновляется, показывает бейдж «✓ Договор подписан», в PDF-viewer'е
+теперь финальный PDF (с юр. блоком). Кнопка «Скачать финальный PDF» доступна.
+Ссылка продолжает работать 7 дней с момента создания сделки. Это осознанное
+решение — см. THREAT_MODEL_DEAL_CYCLE.md §3.G.
 
 ---
 
@@ -132,7 +144,7 @@ PDF».
 ```sql
 CREATE TABLE deals (
     id                          UUID PRIMARY KEY,
-    initiator_user_id           UUID NOT NULL REFERENCES users(id),
+    initiator_tenant_id         TEXT NOT NULL REFERENCES users(firebase_uid),
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     expires_at                  TIMESTAMPTZ NOT NULL,  -- created_at + 7 дней
     status                      TEXT NOT NULL,         -- см. энум ниже
@@ -146,16 +158,26 @@ CREATE TABLE deals (
     counterparty_signature_meta JSONB
 );
 
-CREATE INDEX ix_deals_initiator ON deals(initiator_user_id, created_at DESC);
+CREATE INDEX ix_deals_initiator ON deals(initiator_tenant_id, created_at DESC);
 CREATE UNIQUE INDEX ix_deals_share_token ON deals(share_token);
 CREATE INDEX ix_deals_expires ON deals(expires_at) WHERE status IN ('draft','sent','viewed');
 ```
 
+**Правка E1 (2026-07-24):** предыдущая редакция этого блока писала
+`initiator_user_id UUID NOT NULL REFERENCES users(id)`. Ни `users.id`, ни
+`users.tenant_id` в реальной схеме не существуют (см. `001_init.py` в
+`signfinder-api`) — единственный PK это `users.firebase_uid TEXT`, и
+каждая существующая таблица (`profiles`, `parties`, `signatures`,
+`usage_counters`) ссылается на него через колонку `user_id`.
+`initiator_tenant_id` — сохранённое по ADR-006 имя (tenant_id == user_id
+для персональных аккаунтов), но FK теперь указывает на реально
+существующую колонку. Реализовано в миграции `003_deals.py`.
+
 **Внимание — ADR-002 (договоры не персистятся) частично уточняется:**
 Deal Cycle требует хранить PDF в течение срока действия сделки (7 дней).
 Это осознанное отступление от ADR-002 в рамках конкретного сценария —
-storage путь ограничен `deals/{deal_id}/`, автоудаление по ретенции. Оформить
-отдельным ADR как «уточнение к ADR-002 для сценария Deal Cycle».
+storage путь ограничен `deals/{deal_id}/`, автоудаление по ретенции.
+Оформлено ADR-009.
 
 **Что убрано из схемы** (по сравнению с более ранним драфтом): `counterparty_channel`
 и `counterparty_contact` — не собираем email/телефон контрагента вообще,
@@ -196,6 +218,23 @@ deals/{deal_id}/final.pdf            ← после подписи контра�
 
 Хранение PDF — в существующем StorageBackend (LocalFS/GCS), не в БД.
 
+### 4.5 Формат share_token
+
+Формально:
+- Библиотека: `nanoid` (Python) или эквивалент с криптостойким RNG
+  (`secrets` module)
+- Длина: **32 символа**
+- Алфавит: `A-Za-z0-9_-` (URL-safe, 64 символа)
+- Энтропия: ~192 бита
+- Пример: `V1StGXR8_Z5jdHi6B-myT_ZWqEHcXf9F`
+
+**Почему не UUID:** UUID v4 — 128 бит энтропии и структурированный (легко
+опознать как UUID). nanoid короче в URL и с большей энтропией.
+
+Генерация — в момент создания Deal, коллизии проверяются `INSERT` на
+`UNIQUE INDEX ix_deals_share_token` (при коллизии — очень редкий случай при
+192 битах — перегенерация).
+
 ---
 
 ## 5. API эндпоинты (в SignfinderLand backend)
@@ -223,6 +262,99 @@ deals/{deal_id}/final.pdf            ← после подписи контра�
 | GET | `/v1/public/deals/{share_token}/final-pdf` | Скачать финальный PDF (для контрагента, после `signed`) |
 
 **Rate limit публичных:** 10 req/min на share_token, 60 req/min на IP.
+Реализация — SlowAPI. Ключ IP — из `X-Forwarded-For` (Cloud Run) с fallback
+на RemoteAddr.
+
+### 5.5 Что публичный API возвращает про инициатора
+
+Строгий whitelist через Pydantic-схему `DealPublicView`:
+
+**Отдаётся:**
+- `initiator_email: str` — для отображения «Договор от …» на странице
+- `status: str` — статус сделки
+- `expires_at: datetime` — когда сделка истечёт
+- `download_urls: {pdf: str, final_pdf: Optional[str]}` — ссылки на скачивание
+- `counterparty_anchors: list[Anchor]` — якоря только для стороны контрагента
+  (фильтруются из `saved_anchors` по `party_role` перед отдачей)
+
+**НЕ отдаётся никогда:**
+- `initiator_user_id`, `initiator_firebase_uid`, `initiator_tenant_id`
+- Профиль инициатора (ФИО, компания, реквизиты)
+- Другие сделки инициатора
+- Якоря стороны инициатора
+- Полный `audit_log` (только упрощённый view без IP+UA)
+- Storage-пути (только URL через backend proxy)
+
+Тест: `test_public_view_no_sensitive_fields` — проверяет что ответ не
+содержит перечисленных полей.
+
+### 5.6 Storage security
+
+GCS bucket `signfinder-prod-deals` (новый, отдельный от `signfinder-prod-config`):
+- `uniformBucketLevelAccess: true` — обязательно
+- IAM: read/write только у service account Cloud Run backend'а
+- **Никаких публичных ACL** и **никаких signed URLs с TTL** — все PDF идут
+  через backend endpoint `/v1/public/deals/{token}/*.pdf` с проверкой
+  share_token и текущего статуса сделки
+- При настройке bucket'а `setup_storage.py` проверяет через
+  `gsutil iam get` что `allUsers` / `allAuthenticatedUsers` отсутствуют.
+  При наличии — refuses создание.
+- Local storage (dev/docker-compose) — файлы в volume, недоступны извне
+  сами по себе
+
+**Полный разбор атаки D («прямой доступ к storage мимо backend») —
+THREAT_MODEL_DEAL_CYCLE.md §3.D.**
+
+### 5.7 Атомарность подписания и IDOR-защита
+
+**Правило:** все идентификаторы сделки в публичных эндпоинтах берутся
+исключительно из URL (share_token). Никогда из тела запроса.
+
+Реализация `POST /v1/public/deals/{token}/sign`:
+
+```python
+async def sign_deal_public(
+    share_token: str = Path(...),
+    request: DealSignRequest,  # Pydantic extra='forbid'
+    ...
+):
+    # 1. Find deal by share_token — единственный источник ID
+    deal = await deals.find_by_share_token(share_token)
+    if not deal:
+        raise HTTPException(404)
+
+    # 2. Атомарный UPDATE с проверкой статуса
+    async with db.transaction():
+        result = await db.execute("""
+            UPDATE deals
+            SET status='signed',
+                final_pdf_path=$1,
+                counterparty_signature_meta=$2,
+                audit_log = audit_log || $3::jsonb
+            WHERE share_token=$4
+              AND status IN ('sent','viewed')
+            RETURNING id
+        """, final_path, sig_meta, event_json, share_token)
+
+        if not result:
+            raise HTTPException(409, "Deal already signed or expired")
+```
+
+Pydantic-схема `DealSignRequest`:
+```python
+class DealSignRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    signature_png_b64: str
+    consent_pep: bool  # обязательно True
+    signature_source: Literal['camera', 'file', 'canvas']
+```
+
+Тесты:
+- `test_sign_race_condition_409` — двойной параллельный POST
+- `test_sign_extra_fields_422` — попытка передать `deal_id`, `tenant_id`
+  и т.п. в теле
+
+**Полный разбор атак B и E — THREAT_MODEL_DEAL_CYCLE.md §3.B, §3.E.**
 
 ---
 
@@ -274,7 +406,7 @@ ID сделки: {deal_id}
 > простой электронной подписью в понимании ст. 5 ФЗ-63, и признаю её
 > равнозначной собственноручной подписи на бумажном документе.»
 
-(Формулировка юридически окончательная — по фидбеку юриста; сейчас черновик.)
+*Формулировка — черновик, требует review юриста перед публичным запуском.*
 
 ---
 
@@ -284,7 +416,9 @@ ID сделки: {deal_id}
 
 - Alembic-миграция `deals`
 - Pydantic-модели: `Deal`, `DealCreate`, `DealPublicView`, `DealSignRequest`
-- Расширить storage layout
+  (все с `extra='forbid'`)
+- Генератор `share_token` (nanoid 32, алфавит `A-Za-z0-9_-`)
+- Расширить storage layout (`deals/{deal_id}/*.pdf`)
 - Приватные API: `POST /v1/deals`, `GET /v1/deals`, `GET /v1/deals/{id}`
 - Unit-тесты моделей и API (с моком storage)
 
@@ -305,7 +439,11 @@ ID сделки: {deal_id}
   противоположной стороны
 - Генерация финального PDF с юридическим блоком
 - Кнопка «Скачать финальный PDF» после подписания
-- Rate limits
+- Rate limits (SlowAPI: 10/min per token, 60/min per IP)
+- Response headers: CSP, X-Content-Type-Options, X-Frame-Options
+- Security-тесты: `test_public_view_no_sensitive_fields`,
+  `test_sign_race_condition_409`, `test_sign_extra_fields_422`,
+  rate-limit тесты
 
 ### E3 — Передача ссылки из кабинета (1 день)
 
@@ -359,6 +497,7 @@ ID сделки: {deal_id}
 - Мобильный UX публичной страницы: тач-цели ≥44px, камера работает на iOS Safari
 - Ручные тесты на iPhone Safari + Android Chrome
 - Обновить `SignfinderLand/version.txt` → `2.0.0`
+- Тест `test_no_smtp_imports_anywhere` — проверка что в коде нет SMTP-импортов
 
 **Итого: 8-13 рабочих дней.** (Сократилось с 10-15 после решения об
 отказе от backend-рассылок.)
@@ -382,6 +521,9 @@ ID сделки: {deal_id}
 10. Бейдж версии в topbar кабинета показывает `v2.0.0+{BUILD_NUMBER}`
     (см. `TASK_versioning.md`)
 11. **Ни одной backend-рассылки email никому и никогда** — проверить в коде
+12. **Все security-тесты из THREAT_MODEL_DEAL_CYCLE.md §6 зелёные**
+13. GCS bucket `signfinder-prod-deals` подтверждён без публичных ACL
+    (`gsutil iam get`)
 
 ---
 
@@ -404,6 +546,9 @@ ID сделки: {deal_id}
   же ссылке пока сделка активна.
 - [x] **Q7: Каналы передачи ссылки.** Три кнопки: Скопировать ссылку /
   Открыть в Telegram / Открыть в WhatsApp. mailto: не добавляем.
+- [x] **Q8: Поведение публичной страницы после signed.** Ссылка живёт
+  7 дней, PDF viewer + кнопка «Скачать» доступны любому обладателю
+  share_token. Разбор рисков — THREAT_MODEL §3.G.
 
 **Готово к старту E1.**
 
@@ -414,10 +559,11 @@ ID сделки: {deal_id}
 | Файл | Что |
 |------|-----|
 | `BACKLOG.md` | Приоритетный пункт P1 |
-| `DB_SCHEMA_AND_BACKUP.md` | Обновить: добавить таблицу `deals` |
-| `ADR.md` | Добавить ADR: «Deal Cycle — уточнение ADR-002: PDF хранятся 7 дней в рамках сценария сделки»; ADR: «Отказ от backend-рассылок email в v2.0.0» |
-| `RUNBOOK_TESTING.md` | Расширить тестами публичной страницы |
-| `SECRETS_REGISTRY.md` | Добавить только `TG_FEEDBACK_BOT_TOKEN`, `TG_FEEDBACK_CHAT_ID` (POSTMARK_API_KEY НЕ добавлять — не используем) |
+| `THREAT_MODEL_DEAL_CYCLE.md` | Модель угроз, разбор атак A-H, security-тесты |
+| `DB_SCHEMA_AND_BACKUP.md` | Таблица `deals` (миграция 003) |
+| `ADR.md` | ADR-009 (7-дневное хранение PDF), ADR-010 (отказ от backend-рассылок) |
+| `RUNBOOK_TESTING.md` | 15 планируемых тестов v2.0.0 |
+| `SECRETS_REGISTRY.md` | `TG_FEEDBACK_BOT_TOKEN`, `TG_FEEDBACK_CHAT_ID` (POSTMARK/SES НЕ добавлять) |
 | `../TASK_versioning.md` | Бампим `SignfinderLand/version.txt` → `2.0.0` |
 
 Концепт `SignPDFMVPLocal/SignFinder_Concept_v2.0.md` остаётся legacy-документом
@@ -427,7 +573,9 @@ ID сделки: {deal_id}
 ---
 
 **Автор:** владелец + Claude
-**Версия спеки:** 1.1 (2026-07-23) — отказ от backend-рассылок, версия
-контрагента получает PDF только через «Скачать» на странице
+**Версия спеки:** 1.2 (2026-07-23) — добавлены §4.5 share_token, §5.5 whitelist
+публичного API, §5.6 storage security, §5.7 атомарность и IDOR; уточнено §3
+что публичная страница работает 7 дней и после signed; вынесена отдельная
+модель угроз `THREAT_MODEL_DEAL_CYCLE.md`
 **Целевой релиз:** SignfinderLand v2.0.0
 **Статус:** утверждена, готова к реализации E1
