@@ -40,7 +40,8 @@
 
 ## P1 — SignfinderLand v2.0.0 Deal Cycle (блокер go-live) — утверждено 2026-07-23
 
-> Полная спека: `DEAL_CYCLE_SPEC.md` (v1.1, статус «готова к реализации»).
+> Полная спека: `DEAL_CYCLE_SPEC.md` (v1.2, статус «готова к реализации»).
+> Модель угроз: `THREAT_MODEL_DEAL_CYCLE.md` (v1.0).
 >
 > **Стратегия:** переходим от «инструмент подписи» к «инструмент закрытия
 > сделки». Major bump SignfinderLand (1.0 → 2.0.0) обоснован сменой
@@ -51,7 +52,7 @@
 > **Ключевое архитектурное решение:** SignFinder не отправляет писем и
 > сообщений от своего имени. Инициатор получает временную ссылку и передаёт
 > её контрагенту сам через любой канал. Backend только генерирует ссылку
-> и следит за статусом. Причины и последствия — в спеке §0.
+> и следит за статусом. Причины и последствия — в спеке §0, ADR-010.
 >
 > Без замкнутого цикла первые платящие клиенты дадут шумный фидбек про
 > костыли отправки, а не про реальные фичи.
@@ -60,9 +61,15 @@
 
 - [ ] **E1** Модель Deal + Alembic-миграция + приватные API
   `POST/GET /v1/deals`, `POST /v1/deals/{id}/mark-shared`,
-  `GET /v1/deals/{id}/final-pdf` (1-2д)
+  `GET /v1/deals/{id}/final-pdf` + генератор share_token nanoid 32
+  (1-2д) — **2026-07-24: код готов, PR открыт**
+  (`signfinder-api#1`, branch `feature/e1-deals-model`), CI зелёный
+  (23 passed), миграция 003 применена на `signfinder-cab-test`. Ждёт
+  ручной проверки владельцем и merge — deploy-test.yml (авто после merge
+  в main) ещё не запускался, чекбокс не ставится до этого
 - [ ] **E2** Публичная страница `/sign/{token}` — без auth, фото/файл/canvas,
-  ПЭП-чекбокс, публичные API + кнопка «Скачать финальный PDF» (3-4д)
+  ПЭП-чекбокс, публичные API + кнопка «Скачать финальный PDF»,
+  security-заголовки CSP/X-Frame-Options, rate limits SlowAPI (3-4д)
 - [ ] **E3** Три кнопки передачи в кабинете: Скопировать / TG / WA (1д)
 - [ ] **E4** Кабинет «Мои сделки» со статусами и drill-down, кнопка
   «Скопировать ссылку ещё раз», опциональный бейдж в topbar (1-2д)
@@ -92,6 +99,8 @@
 - [x] Q5: Уведомления контрагенту — не шлём вообще
 - [x] Q6: Копия финального PDF контрагенту — только кнопка «Скачать» на странице
 - [x] Q7: Каналы передачи — Скопировать / Telegram / WhatsApp (3 кнопки)
+- [x] Q8: Поведение после signed — ссылка живёт 7 дней, PDF viewer + скачивание
+  открыты. Threat model §3.G разбирает риски и митигации.
 
 **Критерии готовности:**
 
@@ -105,18 +114,28 @@
 - Истёкшие сделки корректно чистятся
 - Бейдж версии в topbar показывает `v2.0.0+{BUILD}`
 - **Ни одной backend-рассылки email никому и никогда** — проверить в коде
+- **Все security-тесты из THREAT_MODEL_DEAL_CYCLE.md §6 зелёные** (8 тестов
+  распределены по эпикам E1, E2, E7)
+- GCS bucket `signfinder-prod-deals` подтверждён без публичных ACL
+  (`gsutil iam get`)
 
-**Связанные обновления в других документах (сделать вместе с E1):**
+**Связанные обновления в других документах:**
 
-- [ ] `DB_SCHEMA_AND_BACKUP.md` — добавить таблицу `deals` в описание схемы
-- [ ] `ADR.md` — два новых ADR:
-  - «Deal Cycle — уточнение ADR-002: PDF хранятся 7 дней в рамках сценария сделки»
-  - «Отказ от backend-рассылок email в v2.0.0: причины и последствия»
-- [ ] `RUNBOOK_TESTING.md` — новый блок тестов публичной страницы
-- [ ] `SECRETS_REGISTRY.md` — добавить только `TG_FEEDBACK_BOT_TOKEN`
-  и `TG_FEEDBACK_CHAT_ID` (POSTMARK/SES/SendGrid НЕ добавлять — не используем)
+- [x] `THREAT_MODEL_DEAL_CYCLE.md` — модель угроз, разбор атак A-H, security-тесты
+  (создан 2026-07-23)
+- [x] `DEAL_CYCLE_SPEC.md` v1.2 — добавлены §4.5, §5.5, §5.6, §5.7 + ссылки
+  на threat model (2026-07-23)
+- [x] `DB_SCHEMA_AND_BACKUP.md` — добавлена таблица `deals` в описание схемы,
+  миграция 003 (2026-07-23)
+- [x] `ADR.md` — ADR-009 (7-дневное хранение PDF, уточнение ADR-002)
+  и ADR-010 (отказ от backend-рассылок email) добавлены (2026-07-23)
+- [x] `RUNBOOK_TESTING.md` — блок «v2.0.0 Deal Cycle — тесты»,
+  15 планируемых тестов + отдельно security-тесты (2026-07-23)
+- [x] `SECRETS_REGISTRY.md` — добавлены `tg-feedback-bot-token`
+  и `tg-feedback-chat-id` со статусом «⏳ создаётся в E6», явно указано
+  что POSTMARK/SES/SendGrid НЕ добавляются (2026-07-23)
 - [ ] `TASK_versioning.md` — бамп `SignfinderLand/version.txt` → `2.0.0`
-  в E7 (перед деплоем)
+  в E7 (перед деплоем) — сделать в момент E7
 
 ---
 
@@ -133,7 +152,65 @@
 ---
 
 
-- [ ] **Fix-1.1** Bug: LLM не отвечает (Шаг 3) — см. `TASK_fix1.md`
+- [ ] **Fix-1.1** Bug: LLM не отвечает (Шаг 3) — см. `TASK_fix1.md`.
+  **Переоткрыт 2026-07-25** с другой причиной, чем исходно: секрет
+  `DEEPSEEK_API_KEY` подтверждён живым (`gcloud run services describe`)
+  как реально подключённый `secretKeyRef` на текущей ready-ревизии
+  `signfinder-cab-test` — не проблема секрета/IAM. Реальная причина —
+  Cloud Logging: `DeepSeek API call failed: Error code: 400 - The
+  supported API model names are deepseek-v4-pro or deepseek-v4-flash,
+  but you passed deepseek-chat`. Хардкод `DEFAULT_MODEL = "deepseek-chat"`
+  в `signfinder-core/signfinder/llm/deepseek_client.py` — провайдер
+  сменил список поддерживаемых имён моделей, `deepseek-chat` больше не
+  принимается. Требует правки `signfinder-core` (не `signfinder-api`) —
+  вне скоупа `TASK_bugfix_llm_step3.md`, передано владельцу отдельным
+  решением (см. `TASK_bugfix_llm_step3.md` отчёт). Владелец выбрал
+  `deepseek-v4-flash`, фикс в core v1.20.19 (2026-07-25).
+  **Важное наблюдение (`TASK_bugfix_llm_step4.md`):** смена модели
+  почини́ла Шаг 3, но сломала Шаг 4 («LLM не вернул паттерны») — тот же
+  провайдер/клиент, но более крупный промпт (до 15 regex-паттернов,
+  `max_tokens=3000`) получает от `deepseek-v4-flash` пустой `content`
+  при HTTP 200 (`json.JSONDecodeError: Expecting value: char 0`). Шаг 3
+  (меньше промпт, `max_tokens=1500`) не задет. Гипотезы (не подтверждены):
+  reasoning-модель тратит токены на скрытый reasoning вместо видимого
+  ответа на сложную задачу, либо контент-фильтр. Диагностическое
+  логирование добавлено в core v1.20.20 (не фикс) — ждём ещё один живой
+  прогон на test чтобы увидеть `finish_reason`/`usage` и определить
+  причину точно. **Для будущего выбора дефолтной модели проекта:**
+  `deepseek-v4-flash`, похоже, не тянет более сложные/длинные
+  структурированные JSON-задачи этого пайплайна — при выборе замены
+  учитывать не только Шаг 3, но и весь пайплайн целиком.
+  **Решено 2026-07-25 (`TASK_fix_reasoning_model_step4.md`, core
+  v1.20.21):** причина точно подтверждена диагностическим логом —
+  `finish_reason=length`, `reasoning_tokens=3000` из `3000` бюджета,
+  `accepted_prediction_tokens=None`. Не подняли `max_tokens` (владелец
+  отверг — лечит симптом, растит стоимость), вместо этого отключили
+  DeepSeek thinking-режим точечно для Шага 4
+  (`extra_body={"thinking": {"type": "disabled"}}`, официально
+  задокументировано для `v4-pro`/`v4-flash` — отдельной non-reasoning
+  модели у провайдера больше нет, `deepseek-chat` deprecated).
+  `LLMClient.complete()` получил параметр `reasoning: bool = True`
+  (все 4 клиента, действует только DeepSeek). Шаг 3 не тронут.
+  Таблица по пайплайну (`/v1/me/analyze` = `run_pipeline_auto_1`):
+
+  | Шаг | Reasoning нужен? | Почему |
+  |-----|------------------|--------|
+  | Step 3 (`extraction.py`, найти нашу сторону) | Оставлен `True` | Смысловая неопределённость — сопоставить нас среди нескольких поимённых сторон по алиасам/ролям/контексту; сейчас укладывается в 1500 токенов, не трогали без причины |
+  | Step 4 (`regex_generation.py`, генерация паттернов) | `False` (этот фикс) | Механическая задача по чёткому шаблону, смысловой неопределённости нет — reasoning только жёг токены |
+  | Step 5 (`auto1.run_step5`) | LLM не используется | Чистый детерминированный regex-матчинг |
+  | `pipeline/party_resolver.py`, `pipeline/validator.py`, `pipeline/pattern_extractor.py`, `review/reviewer.py` | Не в hot path `/v1/me/analyze` | Свои LLM-вызовы есть, но не вызываются из `run_pipeline_auto_1` — не трогали, та же уязвимость к reasoning-моделям остаётся если когда-то попадут под неё |
+
+  **Уточнение 2026-07-25 (core v1.20.22, тот же TASK):** владелец решил
+  не ограничиваться Шагом 4 — reasoning выключен **по умолчанию на всём
+  `LLMClient.complete()`** (обоснование: `reasoning_content` нигде в
+  кодовой базе не читается, платить за него смысла нет ни на одном шаге,
+  включая Шаг 3 несмотря на его смысловую неопределённость). Дефолт
+  `reasoning: bool = False` на базовом классе + всех 4 клиентах покрыл
+  разом все вызовы `complete()` в пакете — включая перечисленные выше
+  `party_resolver.py`/`validator.py`/`pattern_extractor.py`/
+  `review/reviewer.py`, а также `pipeline/llm_finder.py` и
+  `pdf/language.py` — ни один явно `reasoning=` не передавал, все
+  унаследовали новый дефолт без правки вызовов по отдельности.
 - [ ] **Fix-1.2** Лимит страниц: 3 → 10 (бэкенд + UI)
 - [ ] **Fix-1.3** Убрать версию из topbar
 
@@ -142,12 +219,13 @@
 
 - [x] ~~Выяснить реальный prod GCP project id~~ — **решено:** `signfinder-prod`,
   подтверждено `.firebaserc` + живым Cloud Run. `signfinder-c1163` — легаси.
-- [ ] **Починить `cloudbuild-test.yaml`: добавить `DEEPSEEK_API_KEY` и
-  `API_KEY` в `--set-secrets`.** Подтверждено и живым env, и кодом: легаси/внутренний
-  API-слой (`pipeline`, `templates`, `signers`, `parties`) отвечает 500 без
-  `API_KEY`, LLM молча не работает без `DEEPSEEK_API_KEY`. Кабинет (`/v1/me/*`,
-  то что видит пользователь) не затронут — у него отдельный Firebase-auth.
-  Не P0-инцидент безопасности, но всё равно ломает часть API на test
+- [x] ~~Починить `cloudbuild-test.yaml`: добавить `DEEPSEEK_API_KEY` и
+  `API_KEY` в `--set-secrets`~~ — **подтверждено закрытым 2026-07-25**:
+  `gcloud run services describe` на живой ready-ревизии
+  `signfinder-api-00059-sb5` показывает оба секрета подключены как
+  `secretKeyRef`. (Ранее `SECRETS_REGISTRY.md` утверждал обратное —
+  документ был устаревшим относительно реального состояния, поправлено
+  там же.)
 - [x] ~~Проверить в коде signfinder-api, как обрабатывается отсутствие API_KEY~~ —
   **решено:** `RuntimeError` → 500, не fail-open. Безопасности нет, есть
   только баг доступности
@@ -163,9 +241,14 @@
   753184980506) — не в `.firebaserc`, не проверен
 - [x] ~~Удалить `firebase-admin-sa` из Secret Manager на test и prod~~ —
   не существует ни на одном, NOT_FOUND. Закрыто.
-- [ ] Удалить орфанный секрет `deepseek-api-key` в `signfinder-cab-test`
-  (дублирует по смыслу `deepseek-key`, нигде не подключён) — или выбрать
-  одно имя на все проекты
+- [ ] ~~Удалить орфанный секрет `deepseek-api-key` в `signfinder-cab-test`
+  (дублирует по смыслу `deepseek-key`, нигде не подключён)~~ —
+  **неверно, не удалять:** подтверждено 2026-07-25 живым `gcloud run
+  services describe` — `deepseek-api-key` реально подключён
+  `secretKeyRef` на текущей ready-ревизии test. Не орфан. Осталось
+  только выбрать единое имя секрета на все проекты (test использует
+  `deepseek-api-key`, prod — `deepseek-key`) — чисто косметическая
+  унификация, не удаление
 - [x] ~~GitHub Secrets~~ — `GOOGLE_CREDENTIALS_TEST` + `GOOGLE_CREDENTIALS_PROD`
   добавлены в `signfinder-api`. SA JSON удалён с диска.
 - [x] ~~Billing budget alert~~ — создан на $50/мес, пороги на 40% и 100%.
@@ -204,6 +287,8 @@
   **С v2.0.0 Deal Cycle актуальность растёт:** финальный PDF со сделки
   содержит IP обеих сторон. Одновременно упрощается — SignFinder не оператор
   рассылок (не шлёт email), так что часть требований к Privacy Policy отпадает.
+  Плюс новый пункт: явно прописать 7-дневный срок жизни ссылки после signed
+  (см. THREAT_MODEL_DEAL_CYCLE.md §3.G).
 - [ ] Реестр секретов обновлён этим аудитом, но три пункта отмечены ⚠️/❓ —
   закрыть после ручной проверки (`gcloud secrets list` и т.д.)
 
@@ -218,6 +303,13 @@
   Зелёные локально и в CI. JUnit XML генерируется, доступен как GitHub Actions artifact
 - [x] ~~Alembic~~ — инициализирован, обе существующие миграции конвертированы,
   `stamp head` выполнен на обеих БД
+- [x] ~~Миграции применялись только вручную на prod (`deploy-prod.yml`), не на
+  test/CI~~ — `ci.yml` гонял pytest против той схемы, что уже была на
+  `signfinder-cab-test`, без `alembic upgrade head`; PR с новой миграцией не
+  мог получить её применённой до того как его же тесты запустятся.
+  Исправлено в PR E1 (2026-07-24, первая пост-Alembic миграция `003_deals`
+  это обнаружила): добавлен шаг применения миграций в `ci.yml` перед pytest,
+  тем же паттерном что и в `deploy-prod.yml`.
 - [x] ~~SignfinderLand → SignfinderWeb~~ — запушен в `SignfinderWeb`
 - [x] ~~cloudbuild-test.yaml: все три секрета~~ — `DB_PASSWORD`, `DEEPSEEK_API_KEY`, `API_KEY`
 - [x] ~~prod IAM: `github-actions` SA~~ — `storage.admin` + `iam.serviceAccountUser`
@@ -244,6 +336,24 @@
 выполнено через `setup_monitoring.py` 2026-07-04.
 
 ---
+
+## Технический долг
+
+- [ ] **Dockerfile сирота от `pyproject.toml`** — `signfinder-api/Dockerfile`
+  устанавливает зависимости захардкоженным `pip install` списком, не
+  через `pip install .` из `pyproject.toml`. Каждое добавление
+  зависимости требует двойной правки в двух местах, легко забыть
+  (случилось в E1 → `nanoid` пропущен → упал `deploy-test.yml #33`,
+  2026-07-24, пофикшено хотфиксом в тот же день). Дополнительно
+  сверено 2026-07-24: `alembic`, `sqlalchemy`, `mammoth`, `weasyprint`
+  тоже есть в `pyproject.toml` и тоже отсутствуют в Dockerfile, но не
+  критичны — grep по `app/` не находит ни одного импорта ни одного из
+  них ни на каком уровне (alembic/sqlalchemy — только CLI-миграции вне
+  контейнера; mammoth/weasyprint — мёртвый путь, DOC/DOCX конвертация
+  сейчас идёт через LibreOffice/`soffice` subprocess, см. `me.py`).
+  Отдельный TASK на рефактор: переписать Dockerfile на
+  `COPY pyproject.toml . && pip install .` с промежуточным слоем.
+  Приоритет P2 — чинить после Deal Cycle v2.0.0.
 
 ## P2 — Продуктовый бэклог (после первых данных по воронке)
 

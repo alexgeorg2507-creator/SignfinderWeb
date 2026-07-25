@@ -17,6 +17,7 @@
       { "source": "/api/**", "run": { "serviceId": "signfinder-api", "region": "europe-west1" } },
       { "source": "/app", "destination": "/app/index.html" },
       { "source": "/app/**", "destination": "/app/index.html" },
+      { "source": "/sign/**", "destination": "/sign/index.html" },
       { "source": "/en/enterprise", "destination": "/index-enterprise.html" },
       { "source": "/ru/enterprise", "destination": "/index-enterprise.html" },
       { "source": "/enterprise",    "destination": "/index-enterprise.html" },

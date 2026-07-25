@@ -45,7 +45,7 @@ signatures (
 -- 003_deals.sql (v2.0.0 Deal Cycle, см. DEAL_CYCLE_SPEC.md, ADR-009)
 deals (
   id                          UUID PRIMARY KEY,
-  initiator_tenant_id         TEXT NOT NULL REFERENCES users(tenant_id),
+  initiator_tenant_id         TEXT NOT NULL REFERENCES users(firebase_uid),
   created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at                  TIMESTAMPTZ NOT NULL,       -- created_at + 7 дней
   status                      TEXT NOT NULL,              -- draft|sent|viewed|signed|expired|rejected
@@ -64,6 +64,16 @@ CREATE UNIQUE INDEX ix_deals_share_token ON deals(share_token);
 CREATE INDEX ix_deals_expires ON deals(expires_at)
   WHERE status IN ('draft','sent','viewed');
 ```
+
+**Правка E1 (2026-07-24):** FK у `initiator_tenant_id` исправлен на
+`REFERENCES users(firebase_uid)` — `users.tenant_id`, как и `id`/`user_id`
+на `profiles`/`parties`/`signatures`/`usage_counters` в блоках выше,
+описаны в этом документе как если бы существовала колонка `tenant_id`,
+но в реально применённых миграциях (`signfinder-api/alembic/versions/001_init.py`)
+PK — `users.firebase_uid TEXT`, дочерние таблицы ссылаются на неё через
+колонку `user_id`. Это расхождение документации и кода не создано в E1
+и шире, чем таблица `deals` — не переписано здесь целиком, чтобы не менять
+описание уже задеплоенных таблиц без отдельного решения владельца.
 
 **Уточнение к ADR-002:** договоры пользователей в общем случае не
 персистятся, но в рамках сценария Deal Cycle PDF хранятся 7 дней
@@ -102,7 +112,7 @@ ADR-009.
 |---|------|------|-----------------|-----------------|
 | 001 | init.sql (users, profiles, parties, usage_counters) | июнь 2026 | ✅ | ⏳ |
 | 002 | signatures BYTEA | июнь 2026 | ✅ | ⏳ |
-| 003 | deals (v2.0.0 Deal Cycle) | ⏳ E1 | ⏳ | ⏳ |
+| 003 | deals (v2.0.0 Deal Cycle) | 2026-07-24 | ✅ | ⏳ |
 
 Обновлять эту таблицу при каждой применённой миграции — иначе через месяц
 никто не вспомнит что реально накатано на проде.
