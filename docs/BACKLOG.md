@@ -59,17 +59,17 @@
 
 **Эпики:**
 
-- [ ] **E1** Модель Deal + Alembic-миграция + приватные API
+- [x] ~~**E1** Модель Deal + Alembic-миграция + приватные API~~ —
   `POST/GET /v1/deals`, `POST /v1/deals/{id}/mark-shared`,
-  `GET /v1/deals/{id}/final-pdf` + генератор share_token nanoid 32
-  (1-2д) — **2026-07-24: код готов, PR открыт**
-  (`signfinder-api#1`, branch `feature/e1-deals-model`), CI зелёный
-  (23 passed), миграция 003 применена на `signfinder-cab-test`. Ждёт
-  ручной проверки владельцем и merge — deploy-test.yml (авто после merge
-  в main) ещё не запускался, чекбокс не ставится до этого
-- [ ] **E2** Публичная страница `/sign/{token}` — без auth, фото/файл/canvas,
-  ПЭП-чекбокс, публичные API + кнопка «Скачать финальный PDF»,
-  security-заголовки CSP/X-Frame-Options, rate limits SlowAPI (3-4д)
+  `GET /v1/deals/{id}/final-pdf` + генератор share_token nanoid 32.
+  Смёржено, задеплоено на test, подтверждено (`signfinder-api#1`)
+- [x] ~~**E2** Публичная страница `/sign/{token}`~~ — без auth,
+  фото/файл/canvas, ПЭП-чекбокс, публичные API + кнопка «Скачать
+  финальный PDF», security-заголовки CSP/X-Frame-Options, rate limits
+  SlowAPI. Смёржено 2026-07-25 (`signfinder-api#8`, `SignfinderWeb#1`),
+  задеплоено на test (`api_version: 1.19.1`), смок-тест пройден на живом
+  контуре. **Полный golden path (реальное подписание) не проверен** —
+  нет UI для создания Deal (это E3), см. `DEAL_CYCLE_SPEC.md` E2
 - [ ] **E3** Три кнопки передачи в кабинете: Скопировать / TG / WA (1д)
 - [ ] **E4** Кабинет «Мои сделки» со статусами и drill-down, кнопка
   «Скопировать ссылку ещё раз», опциональный бейдж в topbar (1-2д)
