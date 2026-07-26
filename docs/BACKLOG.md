@@ -73,7 +73,18 @@
 - [ ] **E3** Три кнопки передачи в кабинете: Скопировать / TG / WA (1д)
 - [ ] **E4** Кабинет «Мои сделки» со статусами и drill-down, кнопка
   «Скопировать ссылку ещё раз», опциональный бейдж в topbar (1-2д)
-- [ ] **E5** Ретенция: 7 дней PDF, 30 дней запись, APScheduler-cron (1д)
+- [x] **E5** Ретенция: 7 дней PDF (включая signed), 30 дней запись —
+  `signfinder-api` PR#10 (эндпоинты) + PR#11 (auth-фикс) смёржены,
+  задеплоены на test. Cloud Scheduler, не APScheduler (см.
+  `DEAL_CYCLE_SPEC.md` §8 E5 — правка архитектуры до реализации).
+  **Инцидент, закрыт:** Cloud Scheduler `--headers` не может передать
+  `Authorization` (GCP резервирует имя под свой oauth_token/oidc_token
+  oneof в `HttpTarget`, молча обнуляет значение) — решено через
+  `X-Deals-Cron-Key` вместо `Authorization: Bearer`, тот же секрет
+  `API_KEY`. См. `TASK_e5_scheduler_auth_followup.md`. Провизионирование
+  Cloud Scheduler заданий на test/prod с новым заголовком — за владельцем
+  (`monitoring/setup_deals_retention_cron.py` в signfinder-api генерирует
+  команды)
 - [ ] **E6** Опросник «Что улучшить?» → Telegram владельца (0.5д)
 - [ ] **E7** Юр. блок в финальном PDF + мобильная косметика + iOS Safari
   тесты + бамп `version.txt` → `2.0.0` (1-2д)
