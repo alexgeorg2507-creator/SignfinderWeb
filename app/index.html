@@ -300,6 +300,9 @@
     <div class="mobile-dropdown-item" onclick="showTab('deals')" id="mdrop-deals">
       <span>📋</span> Мои сделки
     </div>
+    <div class="mobile-dropdown-item" onclick="showTab('feedback')" id="mdrop-feedback">
+      <span>💬</span> Что улучшить?
+    </div>
   </div>
 
   <div class="cabinet-layout">
@@ -312,6 +315,9 @@
       </div>
       <div class="nav-item" onclick="showTab('deals')" id="nav-deals">
         <span class="nav-icon">📋</span> Мои сделки
+      </div>
+      <div class="nav-item" onclick="showTab('feedback')" id="nav-feedback">
+        <span class="nav-icon">💬</span> Что улучшить?
       </div>
     </nav>
 
@@ -598,6 +604,27 @@ const TABS = {
     <div class="section-sub">Статус переданных на подпись договоров</div>
     <div id="deals-msg" class="msg"></div>
     <div id="deals-list"></div>`,
+
+  feedback: `
+    <div class="section-title">Что улучшить?</div>
+    <div class="section-sub">Пара вопросов — читаю каждый ответ лично</div>
+    <div class="card" id="feedback-card">
+      <div id="feedback-msg" class="msg"></div>
+      <div id="feedback-form-body">
+        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">За какую фичу вы готовы заплатить?</div>
+        <textarea class="input" id="fb-feature" rows="3" style="resize:vertical" placeholder="Опишите своими словами"></textarea>
+        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">Как вы узнали о SignFinder?</div>
+        <input class="input" id="fb-source" placeholder="LinkedIn, рекомендация, поиск...">
+        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">Порекомендовали бы коллеге?</div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+          <button type="button" class="btn" id="fb-refer-yes" onclick="setFeedbackRefer(true)" style="width:auto;flex:1">Да</button>
+          <button type="button" class="btn" id="fb-refer-no" onclick="setFeedbackRefer(false)" style="width:auto;flex:1">Нет</button>
+        </div>
+        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">Контакт (необязательно)</div>
+        <input class="input" id="fb-contact" placeholder="email, телефон, telegram...">
+        <button class="btn btn-primary" onclick="submitFeedback()" style="margin-top:0.25rem">Отправить</button>
+      </div>
+    </div>`,
 };
 
 window.showTab = (tab) => {
@@ -616,6 +643,7 @@ window.showTab = (tab) => {
   if (tab === "party")     { loadParty(); }
   if (tab === "work")      { initWorkTab(); }
   if (tab === "deals")     { initDealsTab(); }
+  if (tab === "feedback")  { initFeedbackTab(); }
 };
 
 // Fix-21: гамбургер-меню — открыть/закрыть + закрытие по клику вовне
@@ -1639,6 +1667,68 @@ window.downloadDealFinalPdf = async (dealId, evt) => {
   a.href = url; a.download = `signed_${dealId}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+};
+
+// ── Deal Cycle (E6): "Что улучшить?" опросник → Telegram ────────────────────
+
+let _fbRefer = null;
+
+function initFeedbackTab() {
+  _fbRefer = null;
+  const yesBtn = document.getElementById("fb-refer-yes");
+  const noBtn = document.getElementById("fb-refer-no");
+  if (yesBtn) yesBtn.classList.remove("btn-primary");
+  if (noBtn) noBtn.classList.remove("btn-primary");
+}
+
+window.setFeedbackRefer = (value) => {
+  _fbRefer = value;
+  const yesBtn = document.getElementById("fb-refer-yes");
+  const noBtn = document.getElementById("fb-refer-no");
+  if (yesBtn) yesBtn.classList.toggle("btn-primary", value === true);
+  if (noBtn) noBtn.classList.toggle("btn-primary", value === false);
+};
+
+function showFeedbackMsg(text, type) {
+  const el = document.getElementById("feedback-msg");
+  if (!el) return;
+  el.className = "msg" + (type ? " " + type : "");
+  el.textContent = text;
+}
+
+window.submitFeedback = async () => {
+  const feature = (document.getElementById("fb-feature") || {}).value?.trim() || "";
+  if (!feature) {
+    showFeedbackMsg("Опишите фичу — это единственное обязательное поле", "error");
+    return;
+  }
+  const source = (document.getElementById("fb-source") || {}).value?.trim() || "";
+  const contact = (document.getElementById("fb-contact") || {}).value?.trim() || "";
+
+  const payload = {
+    feature_request: feature,
+    source: source || null,
+    would_refer: _fbRefer,
+    contact: contact || null,
+  };
+
+  let res;
+  try {
+    res = await apiFetch("/v1/feedback", { method: "POST", body: JSON.stringify(payload) });
+  } catch (e) {
+    console.error("submitFeedback failed:", e);
+    showFeedbackMsg("Не получилось отправить, попробуйте позже", "error");
+    return;
+  }
+  if (!res.ok) {
+    console.error("submitFeedback failed:", res.status);
+    showFeedbackMsg("Не получилось отправить, попробуйте позже", "error");
+    return;
+  }
+
+  const body = document.getElementById("feedback-form-body");
+  if (body) body.style.display = "none";
+  showFeedbackMsg("Спасибо, передано разработчику", "success");
 };
 
 // ── Fix-7: remember/forget templates, manual placement, page erase ─────────
