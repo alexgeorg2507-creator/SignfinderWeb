@@ -358,6 +358,9 @@ let _signedBlob = null;
 let _signedFilename = null;
 let _currentRenderToken = 0;
 
+// ── Deal Cycle (E3): "передать контрагенту" ─────────────────────────────────
+let _currentDeal = null;   // Deal from POST /v1/deals — one per _workFile (see workSign())
+
 // ── Fix-7 state: remembered templates / manual placement / page exclusion ──
 let _workAnalyzeResult = null;   // full /v1/me/analyze response
 let _rememberedTemplateId = null;
@@ -1111,6 +1114,7 @@ async function handleWorkFile(file) {
   _signedBlob = null; _signedFilename = null;
   _workAnalyzeResult = null; _rememberedTemplateId = null;
   _manualAnchors = []; _excludePages = []; _manualPlaceMode = false;
+  _currentDeal = null;
   _updateToolbarActions();
   document.getElementById("work-result-card").style.display = "none";
   showWorkMsg("", "");
@@ -1298,7 +1302,136 @@ async function workSign(preservePosition = false) {
 
   if (window.posthog) posthog.capture("document_signed");
   loadWorkUsage();
+
+  await createDealAndRenderShare();
 }
+
+// ── Deal Cycle (E3): создать Deal и показать блок «Передать контрагенту» ───
+// Вызывается из workSign() после каждого успешного подписания, но реально
+// создаёт Deal только один раз на _workFile (см. _currentDeal-гвард ниже) —
+// повторное подписание после ручной правки (erase page/manual placement)
+// оставляет уже показанный блок как есть, не плодит дубликаты Deal и не
+// обновляет уже отданную контрагенту ссылку на более новую версию PDF.
+async function createDealAndRenderShare() {
+  if (_currentDeal) return;
+  const anchors = (_workAnalyzeResult && _workAnalyzeResult.counterparty_anchors) || [];
+  // DEAL_CYCLE_SPEC.md §6: если пайплайн не смог определить контрагента
+  // (однa сторона в документе, >2 сторон, или сам подбор паттернов для
+  // контрагента не удался) — предлагать «нарисовать где расписаться»
+  // должно v2.1, не сейчас. Просто не показываем блок передачи.
+  if (!anchors.length || !_workFile || !_signedBlob) return;
+
+  try {
+    const [originalB64, signedB64] = await Promise.all([
+      _blobToBase64(_workFile),
+      _blobToBase64(_signedBlob),
+    ]);
+    const res = await apiFetch("/v1/deals", {
+      method: "POST",
+      body: JSON.stringify({
+        original_pdf_b64: originalB64,
+        initiator_signed_pdf_b64: signedB64,
+        saved_anchors: anchors,
+      }),
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      console.error("POST /v1/deals failed:", res.status, e.detail || e);
+      return;
+    }
+    _currentDeal = await res.json();
+    _renderShareBlock();
+  } catch (e) {
+    // Deal Cycle — надстройка, не должна мешать основному флоу подписания.
+    console.error("createDealAndRenderShare failed:", e);
+    _currentDeal = null;
+  }
+}
+
+async function _blobToBase64(blob) {
+  const buf = await blob.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function _renderShareBlock() {
+  const signArea = document.getElementById("work-sign-area");
+  if (!signArea || !_currentDeal) return;
+  signArea.innerHTML = `
+    <div class="msg info" style="display:block;margin-top:0.75rem">
+      ✓ Договор подписан вами. Передайте ссылку контрагенту — он подпишет её сам, без регистрации.
+    </div>
+    <div id="deal-share-status" style="font-size:12px;color:var(--c-muted);margin:0.25rem 0 0.5rem;min-height:1em"></div>
+    <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap">
+      <button class="btn" style="flex:1;min-width:120px" onclick="copyShareLink()">📋 Скопировать ссылку</button>
+      <button class="btn" style="flex:1;min-width:120px" onclick="shareViaTelegram()">✈️ Telegram</button>
+      <button class="btn" style="flex:1;min-width:120px" onclick="shareViaWhatsApp()">📱 WhatsApp</button>
+    </div>`;
+}
+
+function _dealInitiatorName() {
+  const name = (document.getElementById("pf-name") || {}).value?.trim() || "";
+  return name || (currentUser ? currentUser.email : "");
+}
+
+// Telegram's t.me/share/url puts the link in its own `url=` param (Telegram
+// renders its own preview from it) — baking the link into `text=` too would
+// show it twice. WhatsApp's wa.me has no separate link param, so the link
+// has to live inside the text itself.
+function _dealShareTextTelegram() {
+  return `${_dealInitiatorName()} направил вам договор на подпись через SignFinder. `
+    + `Откройте ссылку, ознакомьтесь и подпишите:`;
+}
+
+function _dealShareTextWhatsApp() {
+  return `${_dealInitiatorName()} направил вам договор на подпись через SignFinder. `
+    + `Откройте ссылку, ознакомьтесь и подпишите: ${_currentDeal.share_url}`;
+}
+
+async function _markDealShared(channel) {
+  if (!_currentDeal) return;
+  try {
+    const res = await apiFetch(`/v1/deals/${_currentDeal.id}/mark-shared`, {
+      method: "POST",
+      body: JSON.stringify({ channel }),
+    });
+    if (res.ok) _currentDeal = await res.json();
+    else console.error("mark-shared failed:", res.status, await res.text().catch(() => ""));
+  } catch (e) {
+    console.error("mark-shared failed:", e);
+    /* статус увидит инициатор в кабинете при следующем заходе (E4) */
+  }
+}
+
+window.copyShareLink = async () => {
+  if (!_currentDeal) return;
+  const st = document.getElementById("deal-share-status");
+  try {
+    await navigator.clipboard.writeText(_currentDeal.share_url);
+    if (st) st.textContent = "✓ Ссылка скопирована";
+  } catch (e) {
+    console.error("clipboard write failed:", e);
+    if (st) st.textContent = _currentDeal.share_url;
+  }
+  _markDealShared("copy_link");
+};
+
+window.shareViaTelegram = () => {
+  if (!_currentDeal) return;
+  const url = "https://t.me/share/url?url=" + encodeURIComponent(_currentDeal.share_url)
+    + "&text=" + encodeURIComponent(_dealShareTextTelegram());
+  window.open(url, "_blank");
+  _markDealShared("telegram");
+};
+
+window.shareViaWhatsApp = () => {
+  if (!_currentDeal) return;
+  const url = "https://wa.me/?text=" + encodeURIComponent(_dealShareTextWhatsApp());
+  window.open(url, "_blank");
+  _markDealShared("whatsapp");
+};
 
 // ── Fix-7: remember/forget templates, manual placement, page erase ─────────
 

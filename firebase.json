@@ -10,7 +10,8 @@
       "**/.github/**",
       "**/.firebase/**",
       "TASK_*",
-      "index-cloud.html"
+      "index-cloud.html",
+      "scripts/**"
     ],
     "cleanUrls": false,
     "rewrites": [
