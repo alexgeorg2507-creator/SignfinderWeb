@@ -121,6 +121,7 @@
   .traffic-pill.green  { background: var(--c-success-bg); color: var(--c-success); }
   .traffic-pill.yellow { background: #fffbeb; color: #92400e; }
   .traffic-pill.red    { background: #fef2f2; color: var(--c-danger); }
+  .traffic-pill.neutral { background: var(--c-bg); color: var(--c-muted); border: 1px solid var(--c-border); }
   .party-row   { display: flex; align-items: center; gap: 0.5rem; font-size: 13px; padding: 0.3rem 0; }
   .party-badge { font-size: 11px; background: var(--c-accent-bg); color: var(--c-accent); border-radius: 4px; padding: 0.15rem 0.4rem; }
 
@@ -296,6 +297,9 @@
     <div class="mobile-dropdown-item" onclick="showTab('work')" id="mdrop-work">
       <span>📄</span> Подписать договор
     </div>
+    <div class="mobile-dropdown-item" onclick="showTab('deals')" id="mdrop-deals">
+      <span>📋</span> Мои сделки
+    </div>
   </div>
 
   <div class="cabinet-layout">
@@ -305,6 +309,9 @@
       </div>
       <div class="nav-item" onclick="showTab('work')" id="nav-work">
         <span class="nav-icon">📄</span> Подписать договор
+      </div>
+      <div class="nav-item" onclick="showTab('deals')" id="nav-deals">
+        <span class="nav-icon">📋</span> Мои сделки
       </div>
     </nav>
 
@@ -585,6 +592,12 @@ const TABS = {
         </div>
       </div>
     </div>`,
+
+  deals: `
+    <div class="section-title">Мои сделки</div>
+    <div class="section-sub">Статус переданных на подпись договоров</div>
+    <div id="deals-msg" class="msg"></div>
+    <div id="deals-list"></div>`,
 };
 
 window.showTab = (tab) => {
@@ -602,6 +615,7 @@ window.showTab = (tab) => {
   if (tab === "profile")   { loadProfile(); initSignatureTab(); }
   if (tab === "party")     { loadParty(); }
   if (tab === "work")      { initWorkTab(); }
+  if (tab === "deals")     { initDealsTab(); }
 };
 
 // Fix-21: гамбургер-меню — открыть/закрыть + закрытие по клику вовне
@@ -1431,6 +1445,200 @@ window.shareViaWhatsApp = () => {
   const url = "https://wa.me/?text=" + encodeURIComponent(_dealShareTextWhatsApp());
   window.open(url, "_blank");
   _markDealShared("whatsapp");
+};
+
+// ── Deal Cycle (E4): "Мои сделки" ───────────────────────────────────────────
+
+const _DEAL_STATUS_PILL = {
+  draft:    { cls: "neutral", label: "Черновик" },
+  sent:     { cls: "neutral", label: "Отправлено" },
+  viewed:   { cls: "yellow",  label: "Контрагент открыл" },
+  signed:   { cls: "green",   label: "Подписано" },
+  expired:  { cls: "red",     label: "Истекло" },
+  rejected: { cls: "red",     label: "Отклонено" },
+};
+
+const _DEAL_CHANNEL_ICON = { copy_link: "📋", telegram: "✈️", whatsapp: "📱" };
+
+let _dealsCache = [];
+
+async function initDealsTab() {
+  const listEl = document.getElementById("deals-list");
+  if (!listEl) return;
+  listEl.innerHTML = '<p class="hint">Загрузка…</p>';
+  showDealsMsg("", "");
+
+  let res;
+  try {
+    res = await apiFetch("/v1/deals?limit=50");
+  } catch {
+    listEl.innerHTML = "";
+    showDealsMsg("Ошибка соединения", "error");
+    return;
+  }
+  if (!res.ok) {
+    listEl.innerHTML = "";
+    showDealsMsg("Не удалось загрузить сделки", "error");
+    return;
+  }
+  _dealsCache = await res.json();
+  renderDealsList();
+}
+
+function showDealsMsg(text, type) {
+  const el = document.getElementById("deals-msg");
+  if (!el) return;
+  el.className = "msg" + (type ? " " + type : "");
+  el.textContent = text;
+}
+
+function _formatDealDate(iso) {
+  return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+}
+
+function _ruDaysWord(n) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "день";
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "дня";
+  return "дней";
+}
+
+function _dealExpiryLabel(expiresAt) {
+  const diffMs = new Date(expiresAt) - new Date();
+  if (diffMs <= 0) return "истекла";
+  const days = Math.ceil(diffMs / 86400000);
+  return `истекает через ${days} ${_ruDaysWord(days)}`;
+}
+
+function renderDealsList() {
+  const listEl = document.getElementById("deals-list");
+  if (!listEl) return;
+  if (!_dealsCache.length) {
+    listEl.innerHTML = '<p class="hint">Сделок пока нет — подпишите договор во вкладке «Подписать договор», появится кнопка передачи контрагенту.</p>';
+    return;
+  }
+  listEl.innerHTML = _dealsCache.map((d) => {
+    const pill = _DEAL_STATUS_PILL[d.status] || { cls: "neutral", label: d.status };
+    const channelIcon = d.share_channel_used ? (_DEAL_CHANNEL_ICON[d.share_channel_used] || "") : "—";
+    return `
+      <div class="card" data-deal-id="${d.id}" onclick="toggleDealDetail('${d.id}')" style="cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
+          <div>
+            <div style="font-size:14px;font-weight:500">${_formatDealDate(d.created_at)}</div>
+            <div style="font-size:12px;color:var(--c-muted)">${_dealExpiryLabel(d.expires_at)} · ${channelIcon}</div>
+          </div>
+          <div class="traffic-pill ${pill.cls}" style="margin-bottom:0">${pill.label}</div>
+        </div>
+        <div id="deal-detail-${d.id}" class="deal-detail" style="display:none;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--c-border)"></div>
+      </div>`;
+  }).join("");
+}
+
+window.toggleDealDetail = async (dealId) => {
+  const detailEl = document.getElementById(`deal-detail-${dealId}`);
+  if (!detailEl) return;
+  const opening = detailEl.style.display === "none";
+  // Один открытый drill-down за раз — схлопываем остальные.
+  document.querySelectorAll(".deal-detail").forEach((el) => { if (el !== detailEl) el.style.display = "none"; });
+  detailEl.style.display = opening ? "block" : "none";
+  if (!opening || detailEl.dataset.loaded) return;
+
+  detailEl.innerHTML = '<p class="hint">Загрузка…</p>';
+  let res;
+  try {
+    res = await apiFetch(`/v1/deals/${dealId}`);
+  } catch (e) {
+    console.error("GET /v1/deals/{id} failed:", e);
+    detailEl.innerHTML = '<p class="hint" style="color:var(--c-danger)">Ошибка соединения</p>';
+    return;
+  }
+  if (!res.ok) {
+    console.error("GET /v1/deals/{id} failed:", res.status);
+    detailEl.innerHTML = '<p class="hint" style="color:var(--c-danger)">Не удалось загрузить детали</p>';
+    return;
+  }
+  const deal = await res.json();
+  detailEl.dataset.loaded = "1";
+  detailEl.innerHTML = _renderDealDetail(deal);
+};
+
+const _AUDIT_EVENT_LABEL = {
+  created: "Сделка создана",
+  sent: "Ссылка передана контрагенту",
+  viewed: "Контрагент открыл ссылку",
+  signed: "Контрагент подписал",
+};
+
+function _renderDealDetail(deal) {
+  const timeline = (deal.audit_log || []).map((ev) => {
+    const label = _AUDIT_EVENT_LABEL[ev.event] || ev.event;
+    const when = new Date(ev.at).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+    return `<div style="font-size:13px;padding:0.2rem 0"><b>${label}</b> — ${when}</div>`;
+  }).join("") || '<p class="hint">Событий пока нет.</p>';
+
+  // draft тоже попадает сюда (подписал, ни разу не нажал кнопку передачи
+  // в E3-блоке) — единственный способ вернуться к передаче такой сделки.
+  const canReshare = !["signed", "expired", "rejected"].includes(deal.status);
+  const canDownload = deal.status === "signed" && deal.has_final_pdf;
+
+  const downloadBtn = canDownload
+    ? `<button class="btn" onclick="downloadDealFinalPdf('${deal.id}', event)">Скачать финальный PDF</button>`
+    : "";
+  const reshareBtn = canReshare
+    ? `<button class="btn" onclick="copyDealLinkAgain('${deal.id}', event)">📋 Скопировать ссылку ещё раз</button>`
+    : "";
+
+  return `
+    <div style="font-size:13px;font-weight:600;margin-bottom:0.4rem">История</div>
+    ${timeline}
+    <div id="deal-detail-status-${deal.id}" style="font-size:12px;color:var(--c-muted);margin:0.4rem 0;min-height:1em"></div>
+    <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap">${downloadBtn}${reshareBtn}</div>`;
+}
+
+window.copyDealLinkAgain = async (dealId, evt) => {
+  if (evt) evt.stopPropagation();
+  const statusEl = document.getElementById(`deal-detail-status-${dealId}`);
+  // DealListItem (кэш списка) не содержит share_url — берём полную запись.
+  let res;
+  try {
+    res = await apiFetch(`/v1/deals/${dealId}`);
+  } catch (e) {
+    console.error("copyDealLinkAgain fetch failed:", e);
+    return;
+  }
+  if (!res.ok) {
+    console.error("copyDealLinkAgain fetch failed:", res.status);
+    return;
+  }
+  const deal = await res.json();
+  try {
+    await navigator.clipboard.writeText(deal.share_url);
+    if (statusEl) statusEl.textContent = "✓ Ссылка скопирована";
+  } catch (e) {
+    console.error("clipboard write failed:", e);
+    if (statusEl) statusEl.textContent = deal.share_url;
+  }
+};
+
+window.downloadDealFinalPdf = async (dealId, evt) => {
+  if (evt) evt.stopPropagation();
+  let res;
+  try {
+    res = await apiFetch(`/v1/deals/${dealId}/final-pdf`);
+  } catch (e) {
+    console.error("downloadDealFinalPdf failed:", e);
+    return;
+  }
+  if (!res.ok) {
+    console.error("downloadDealFinalPdf failed:", res.status);
+    return;
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `signed_${dealId}.pdf`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 };
 
 // ── Fix-7: remember/forget templates, manual placement, page erase ─────────
