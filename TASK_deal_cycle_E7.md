@@ -169,15 +169,22 @@ Android исторически полны сюрпризов, которые н�
 
 ## §4. Definition of Done
 
-- [ ] `test_no_smtp_imports_anywhere` зелёный, добавлен в `tests/test_deals_no_email.py`
-- [ ] Юр. блок в финальном PDF содержит IP/UA **обеих** сторон (инициатор + контрагент)
-- [ ] `/pep-agreement` резолвится (rewrite в `firebase.json`), не 404
-- [ ] Ссылка на `/pep-agreement` есть и в кабинете, и на публичной странице
-- [ ] `SignfinderLand/version.txt` = `2.0.0`
-- [ ] `signfinder-api/pyproject.toml` бампнут, если правился код пакета
-- [ ] PR в `signfinder-api` (если были правки 1.1/1.2) и `SignfinderWeb` — раздельно, как обычно
+- [x] `test_no_smtp_imports_anywhere` зелёный, добавлен в `tests/test_deals_no_email.py`
+- [x] Юр. блок в финальном PDF содержит IP/UA **обеих** сторон (инициатор + контрагент) — подтверждено живым вызовом на test, 2026-07-29
+- [x] `/pep-agreement` резолвится (rewrite в `firebase.json`), 200 на `signfinder-cab-test.web.app`
+- [x] Ссылка на `/pep-agreement` есть и в кабинете, и на публичной странице
+- [x] `SignfinderLand/version.txt` = `2.0.0`
+- [x] `signfinder-api/pyproject.toml` бампнут, `/v1/version` = 1.19.7 на test
+- [x] PR в `signfinder-api` (#15) и `SignfinderWeb` (#8) — смёржены, задеплоены на test
 - [ ] Ручной чек-лист §3 пройден владельцем на реальных устройствах —
   **это финальный гейт go-live, не пропускать даже если код весь зелёный**
+- [ ] Prod ещё не тронут — `signfinder.app` всё ещё 1.0/404 на `/pep-agreement`.
+  Промоушн всего v2.0.0 на prod — отдельный ручной шаг владельца
+  (`deploy-prod.yml` для обоих репо), после ручного QA выше
+
+Отдельно, не в этом файле: прод-секреты Telegram-бота для E6 (фидбек)
+всё ещё ❓ в `SECRETS_REGISTRY.md` — бесполезны заводить раньше промоушена
+кода на prod — эндпоинта `/v1/feedback` там физически ещё нет.
 
 После зелёного DoD — критерии готовности `DEAL_CYCLE_SPEC.md` §9 закрыты
 все, кроме тех что явно не про код (№1-4, №7 — уже E5). v2.0.0 готова к
