@@ -101,6 +101,7 @@ let _processedSigB64 = null;
 let _activeTab = 'camera';
 let _drawing = false;
 let _canvasHasInk = false;
+let _canvasInitialized = false;
 
 function apiFetch(path, opts = {}) {
   return fetch('/api' + path, opts);
@@ -302,13 +303,16 @@ window.switchTab = (tab) => {
     el(`tab-btn-${t}`).classList.toggle('active', t === tab);
     el(`tab-${t}`).classList.toggle('active', t === tab);
   }
+  // fix16: canvas is display:none until this tab is picked, so it can only
+  // be measured/sized once it's actually visible — see sizeCanvas().
+  if (tab === 'canvas') sizeCanvas();
 };
 
 function wireSigningForm() {
   el('consent-pep').addEventListener('change', updateSignButtonState);
   el('inp-camera').addEventListener('change', (e) => onSignatureFile(e.target.files[0]));
   el('inp-file').addEventListener('change', (e) => onSignatureFile(e.target.files[0]));
-  setupCanvas();
+  wireCanvasEvents();
 }
 
 function updateSignButtonState() {
@@ -357,11 +361,18 @@ function applyProcessedSignature(data) {
 
 // ── Canvas drawing (mouse + touch/pointer) ──────────────────────────────────
 
-function setupCanvas() {
+// fix16: canvas has display:none until the "Нарисовать" tab is picked, and
+// a hidden element's getBoundingClientRect() is always 0x0 — sizing had to
+// be split out from event wiring (which doesn't care about visibility) and
+// deferred until the tab actually shows the canvas. Guarded by
+// _canvasInitialized so switching tabs back and forth doesn't reset (and
+// erase) an already-sized, already-drawn-on canvas.
+function sizeCanvas() {
   const canvas = el('sign-canvas');
-  if (!canvas) return;
-  const dpr = window.devicePixelRatio || 1;
+  if (!canvas || _canvasInitialized) return;
   const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;  // still hidden
+  const dpr = window.devicePixelRatio || 1;
   canvas.width = rect.width * dpr;
   canvas.height = rect.height * dpr;
   const ctx = canvas.getContext('2d');
@@ -369,6 +380,12 @@ function setupCanvas() {
   ctx.lineWidth = 2.5;
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#1a1a18';
+  _canvasInitialized = true;
+}
+
+function wireCanvasEvents() {
+  const canvas = el('sign-canvas');
+  if (!canvas) return;
 
   let last = null;
 
@@ -385,6 +402,7 @@ function setupCanvas() {
   canvas.addEventListener('pointermove', (e) => {
     if (!_drawing) return;
     const p = pos(e);
+    const ctx = canvas.getContext('2d');
     ctx.beginPath();
     ctx.moveTo(last.x, last.y);
     ctx.lineTo(p.x, p.y);
