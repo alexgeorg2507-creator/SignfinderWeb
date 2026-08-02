@@ -175,6 +175,35 @@
   /* Fix-20: инструменты всегда видны — неактивные тускнеют, а не пропадают */
   .icon-btn.disabled { opacity: 0.35; cursor: default; pointer-events: none; }
 
+  /* fix15 §2: попап передачи ссылки контрагенту — один триггер вместо трёх
+     отдельных иконок в тесном ряду (тач-цели ≥44px внутри попапа, не
+     ограничены 30px иконками ряда). */
+  .toolbar-icon-wrap { position: relative; }
+  .toolbar-share-dropdown { display: none; position: absolute; top: calc(100% + 6px); right: 0;
+    background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 10px;
+    box-shadow: var(--shadow); z-index: 20; overflow: hidden; min-width: 210px; }
+  .toolbar-share-dropdown.open { display: block; }
+  .toolbar-share-dropdown-item { display: flex; align-items: center; gap: 0.6rem; width: 100%;
+    padding: 0.75rem 1rem; font-size: 14px; cursor: pointer; color: var(--c-text);
+    background: none; border: none; text-align: left; font-family: inherit; min-height: 44px; box-sizing: border-box; }
+  .toolbar-share-dropdown-item:hover { background: var(--c-bg); }
+  .toolbar-share-status { font-size: 11px; color: var(--c-muted); padding: 0 1rem 0.6rem; min-height: 1em; }
+
+  /* fix15 §3.2: крестик прячет сделку из списка (не удаляет — юр. след и
+     ретенция живут своё), в углу карточки. */
+  .deal-hide-btn { position: absolute; top: 0.5rem; right: 0.5rem; width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center; border: none; background: none;
+    color: var(--c-muted); font-size: 15px; line-height: 1; cursor: pointer; border-radius: 6px; }
+  .deal-hide-btn:hover { background: var(--c-bg); color: var(--c-text); }
+
+  /* fix15 §5: опросник — переиспользует .btn как toggle (тот же паттерн, что
+     уже был у would_refer Да/Нет), не заводит native radio/checkbox стили. */
+  .fb-toggle-group { display: flex; flex-direction: column; gap: 0.5rem; }
+  .fb-toggle-group-chips { flex-direction: row; flex-wrap: wrap; }
+  .fb-toggle-btn { width: auto; justify-content: flex-start; text-align: left; font-size: 13px; line-height: 1.4; }
+  .fb-toggle-group-chips .fb-toggle-btn { flex: 1 1 auto; justify-content: center; text-align: center; }
+  .fb-toggle-btn.btn-primary { font-weight: 500; }
+
   /* Fix-20: строка с приватностью + лимитом документов, перенесена в панель превью */
   .pdf-preview-info-strip { display: flex; align-items: center; justify-content: space-between;
     gap: 0.75rem; padding: 0.45rem 0.75rem; font-size: 11px; color: var(--c-muted);
@@ -549,7 +578,18 @@ const TABS = {
             <button class="icon-btn disabled" id="btn-download" onclick="downloadSignedPdf()" title="Скачать">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
             </button>
-            <button class="icon-btn disabled" id="btn-share" onclick="shareSignedPdf()" title="Поделиться">
+            <div class="toolbar-icon-wrap">
+              <button class="icon-btn disabled" id="btn-share-deal" onclick="toggleShareDealDropdown(event)" title="Передать контрагенту на подпись">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+              <div class="toolbar-share-dropdown" id="share-deal-dropdown">
+                <button type="button" class="toolbar-share-dropdown-item" onclick="copyShareLink()">📋 Скопировать ссылку</button>
+                <button type="button" class="toolbar-share-dropdown-item" onclick="shareViaTelegram()">✈️ Telegram</button>
+                <button type="button" class="toolbar-share-dropdown-item" onclick="shareViaWhatsApp()">📱 WhatsApp</button>
+                <div class="toolbar-share-status" id="deal-share-status"></div>
+              </div>
+            </div>
+            <button class="icon-btn disabled" id="btn-share" onclick="shareSignedPdf()" title="Поделиться файлом">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
             </button>
           </div>
@@ -588,8 +628,12 @@ const TABS = {
                 <span><b>Скачать</b> подписанный документ</span>
               </div>
               <div class="icon-legend-row">
+                <span class="inst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2"/></svg></span>
+                <span><b>Передать контрагенту</b> — ссылка на подпись без регистрации: Telegram, WhatsApp или просто скопировать</span>
+              </div>
+              <div class="icon-legend-row">
                 <span class="inst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></span>
-                <span><b>Поделиться</b> — отправить в Telegram, WhatsApp, почту...</span>
+                <span><b>Поделиться файлом</b> — экспорт самого PDF в другое приложение</span>
               </div>
             </div>
             <ol>
@@ -614,18 +658,32 @@ const TABS = {
     <div class="card" id="feedback-card">
       <div id="feedback-msg" class="msg"></div>
       <div id="feedback-form-body">
-        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">За какую фичу вы готовы заплатить?</div>
-        <textarea class="input" id="fb-feature" rows="3" style="resize:vertical" placeholder="Опишите своими словами"></textarea>
-        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">Как вы узнали о SignFinder?</div>
-        <input class="input" id="fb-source" placeholder="LinkedIn, рекомендация, поиск...">
-        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">Порекомендовали бы коллеге?</div>
+        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">Как вы используете SignFinder?</div>
+        <div class="fb-toggle-group fb-toggle-group-chips" id="fb-usage-type-group">
+          <button type="button" class="btn fb-toggle-btn" data-value="freelancer" onclick="setFeedbackUsageType('freelancer')">Фрилансер / ИП</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="small_business" onclick="setFeedbackUsageType('small_business')">Малый бизнес</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="legal_dept" onclick="setFeedbackUsageType('legal_dept')">Юридический отдел / агентство</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="other" onclick="setFeedbackUsageType('other')">Другое</button>
+        </div>
+
+        <div style="font-size:14px;font-weight:500;margin:1rem 0 0.4rem">За какую из этих фич вы готовы платить?</div>
+        <div class="fb-toggle-group" id="fb-premium-features-group">
+          <button type="button" class="btn fb-toggle-btn" data-value="local_deployment" onclick="toggleFeedbackPremiumFeature('local_deployment')">Локальная установка — документы не покидают вашу инфраструктуру</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="two_sided_signing" onclick="toggleFeedbackPremiumFeature('two_sided_signing')">Двустороннее подписание через сервис</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="higher_limits" onclick="toggleFeedbackPremiumFeature('higher_limits')">Расширенные лимиты объёма документов</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="api_integrations" onclick="toggleFeedbackPremiumFeature('api_integrations')">API/интеграции (Cursor, Claude Desktop и т.п.)</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="team_access" onclick="toggleFeedbackPremiumFeature('team_access')">Командный доступ — несколько сотрудников на аккаунт</button>
+        </div>
+        <input class="input" id="fb-premium-other" placeholder="Другое (необязательно)" oninput="_updateFeedbackSubmitState()" style="margin-top:0.5rem">
+
+        <div style="font-size:14px;font-weight:500;margin:1rem 0 0.4rem">Порекомендовали бы коллеге?</div>
         <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
           <button type="button" class="btn" id="fb-refer-yes" onclick="setFeedbackRefer(true)" style="width:auto;flex:1">Да</button>
           <button type="button" class="btn" id="fb-refer-no" onclick="setFeedbackRefer(false)" style="width:auto;flex:1">Нет</button>
         </div>
         <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">Контакт (необязательно)</div>
-        <input class="input" id="fb-contact" placeholder="email, телефон, telegram...">
-        <button class="btn btn-primary" onclick="submitFeedback()" style="margin-top:0.25rem">Отправить</button>
+        <input class="input" id="fb-contact" placeholder="email, телефон, telegram..." oninput="_updateFeedbackSubmitState()">
+        <button class="btn btn-primary" id="feedback-submit-btn" onclick="submitFeedback()" style="margin-top:0.25rem" disabled>Отправить</button>
       </div>
     </div>`,
 };
@@ -665,6 +723,27 @@ document.addEventListener('click', (ev) => {
   if (!dd || !dd.classList.contains('open')) return;
   if (dd.contains(ev.target) || (btn && btn.contains(ev.target))) return;
   closeMobileMenu();
+});
+
+// fix15 §2: попап «Передать контрагенту» в тулбаре превью — тот же паттерн
+// открытия/закрытия по клику вовне, что гамбургер-меню выше.
+function closeShareDealDropdown() {
+  const dd = document.getElementById('share-deal-dropdown');
+  if (dd) dd.classList.remove('open');
+}
+window.toggleShareDealDropdown = (ev) => {
+  if (ev) ev.stopPropagation();
+  const btn = document.getElementById('btn-share-deal');
+  if (btn && btn.classList.contains('disabled')) return;
+  const dd = document.getElementById('share-deal-dropdown');
+  if (dd) dd.classList.toggle('open');
+};
+document.addEventListener('click', (ev) => {
+  const dd = document.getElementById('share-deal-dropdown');
+  const btn = document.getElementById('btn-share-deal');
+  if (!dd || !dd.classList.contains('open')) return;
+  if (dd.contains(ev.target) || (btn && btn.contains(ev.target))) return;
+  closeShareDealDropdown();
 });
 
 // ── API helper ─────────────────────────────────────────────────────────────
@@ -854,6 +933,12 @@ window.saveParty = async () => {
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+function _escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
 function showTabMsg(id, text, type) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -1377,6 +1462,7 @@ async function createDealAndRenderShare() {
         original_pdf_b64: originalB64,
         initiator_signed_pdf_b64: signedB64,
         saved_anchors: anchors,
+        original_filename: _workFile.name,
       }),
     });
     if (!res.ok) {
@@ -1386,6 +1472,7 @@ async function createDealAndRenderShare() {
     }
     _currentDeal = await res.json();
     _renderShareBlock();
+    _updateToolbarActions();
   } catch (e) {
     // Deal Cycle — надстройка, не должна мешать основному флоу подписания.
     console.error("createDealAndRenderShare failed:", e);
@@ -1402,17 +1489,14 @@ async function _blobToBase64(blob) {
 }
 
 function _renderShareBlock() {
+  // fix15 §2.1: три кнопки передачи переехали в тулбар превью (значок
+  // "Передать контрагенту", btn-share-deal) — здесь остаётся только
+  // подтверждение с указателем на новое место.
   const signArea = document.getElementById("work-sign-area");
   if (!signArea || !_currentDeal) return;
   signArea.innerHTML = `
     <div class="msg info" style="display:block;margin-top:0.75rem">
-      ✓ Договор подписан вами. Передайте ссылку контрагенту — он подпишет её сам, без регистрации.
-    </div>
-    <div id="deal-share-status" style="font-size:12px;color:var(--c-muted);margin:0.25rem 0 0.5rem;min-height:1em"></div>
-    <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap">
-      <button class="btn" style="flex:1;min-width:120px" onclick="copyShareLink()">📋 Скопировать ссылку</button>
-      <button class="btn" style="flex:1;min-width:120px" onclick="shareViaTelegram()">✈️ Telegram</button>
-      <button class="btn" style="flex:1;min-width:120px" onclick="shareViaWhatsApp()">📱 WhatsApp</button>
+      ✓ Договор подписан вами. Нажмите ✈️ в панели инструментов сверху, чтобы передать ссылку контрагенту — он подпишет её сам, без регистрации.
     </div>`;
 }
 
@@ -1469,6 +1553,7 @@ window.shareViaTelegram = () => {
     + "&text=" + encodeURIComponent(_dealShareTextTelegram());
   window.open(url, "_blank");
   _markDealShared("telegram");
+  closeShareDealDropdown();
 };
 
 window.shareViaWhatsApp = () => {
@@ -1476,6 +1561,7 @@ window.shareViaWhatsApp = () => {
   const url = "https://wa.me/?text=" + encodeURIComponent(_dealShareTextWhatsApp());
   window.open(url, "_blank");
   _markDealShared("whatsapp");
+  closeShareDealDropdown();
 };
 
 // ── Deal Cycle (E4): "Мои сделки" ───────────────────────────────────────────
@@ -1551,12 +1637,14 @@ function renderDealsList() {
   listEl.innerHTML = _dealsCache.map((d) => {
     const pill = _DEAL_STATUS_PILL[d.status] || { cls: "neutral", label: d.status };
     const channelIcon = d.share_channel_used ? (_DEAL_CHANNEL_ICON[d.share_channel_used] || "") : "—";
+    const fileName = d.original_filename || "Договор";
     return `
-      <div class="card" data-deal-id="${d.id}" onclick="toggleDealDetail('${d.id}')" style="cursor:pointer">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
+      <div class="card" data-deal-id="${d.id}" onclick="toggleDealDetail('${d.id}')" style="cursor:pointer;position:relative">
+        <button class="deal-hide-btn" onclick="hideDeal('${d.id}', event)" title="Скрыть из списка" aria-label="Скрыть из списка">✕</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;padding-right:1.75rem">
           <div>
-            <div style="font-size:14px;font-weight:500">${_formatDealDate(d.created_at)}</div>
-            <div style="font-size:12px;color:var(--c-muted)">${_dealExpiryLabel(d.expires_at)} · ${channelIcon}</div>
+            <div style="font-size:14px;font-weight:500">${_escapeHtml(fileName)}</div>
+            <div style="font-size:12px;color:var(--c-muted)">${_formatDealDate(d.created_at)} · ${_dealExpiryLabel(d.expires_at)} · ${channelIcon}</div>
           </div>
           <div class="traffic-pill ${pill.cls}" style="margin-bottom:0">${pill.label}</div>
         </div>
@@ -1564,6 +1652,28 @@ function renderDealsList() {
       </div>`;
   }).join("");
 }
+
+window.hideDeal = async (dealId, evt) => {
+  if (evt) evt.stopPropagation();
+  let res;
+  try {
+    res = await apiFetch(`/v1/deals/${dealId}/hide`, { method: "POST" });
+  } catch (e) {
+    console.error("hideDeal failed:", e);
+    showDealsMsg("Ошибка соединения", "error");
+    return;
+  }
+  if (!res.ok) {
+    console.error("hideDeal failed:", res.status);
+    showDealsMsg("Не удалось скрыть сделку", "error");
+    return;
+  }
+  // Крестик прячет сделку из списка (hidden_by_initiator), а не удаляет её —
+  // юридический след (E7 IP/UA) и 7-дневная ретенция (ADR-009) не зависят
+  // от того, хочет ли инициатор видеть её в кабинете. См. TASK_fix15.md §3.2.
+  _dealsCache = _dealsCache.filter((d) => d.id !== dealId);
+  renderDealsList();
+};
 
 window.toggleDealDetail = async (dealId) => {
   const detailEl = document.getElementById(`deal-detail-${dealId}`);
@@ -1675,14 +1785,41 @@ window.downloadDealFinalPdf = async (dealId, evt) => {
 // ── Deal Cycle (E6): "Что улучшить?" опросник → Telegram ────────────────────
 
 let _fbRefer = null;
+let _fbUsageType = null;
+let _fbPremiumFeatures = new Set();
 
 function initFeedbackTab() {
   _fbRefer = null;
+  _fbUsageType = null;
+  _fbPremiumFeatures = new Set();
   const yesBtn = document.getElementById("fb-refer-yes");
   const noBtn = document.getElementById("fb-refer-no");
   if (yesBtn) yesBtn.classList.remove("btn-primary");
   if (noBtn) noBtn.classList.remove("btn-primary");
+  document.querySelectorAll("#fb-usage-type-group .fb-toggle-btn, #fb-premium-features-group .fb-toggle-btn")
+    .forEach((btn) => btn.classList.remove("btn-primary"));
+  const other = document.getElementById("fb-premium-other");
+  if (other) other.value = "";
+  const contact = document.getElementById("fb-contact");
+  if (contact) contact.value = "";
+  _updateFeedbackSubmitState();
 }
+
+window.setFeedbackUsageType = (value) => {
+  _fbUsageType = value;
+  document.querySelectorAll("#fb-usage-type-group .fb-toggle-btn").forEach((btn) => {
+    btn.classList.toggle("btn-primary", btn.dataset.value === value);
+  });
+  _updateFeedbackSubmitState();
+};
+
+window.toggleFeedbackPremiumFeature = (value) => {
+  if (_fbPremiumFeatures.has(value)) _fbPremiumFeatures.delete(value);
+  else _fbPremiumFeatures.add(value);
+  const btn = document.querySelector(`#fb-premium-features-group .fb-toggle-btn[data-value="${value}"]`);
+  if (btn) btn.classList.toggle("btn-primary", _fbPremiumFeatures.has(value));
+  _updateFeedbackSubmitState();
+};
 
 window.setFeedbackRefer = (value) => {
   _fbRefer = value;
@@ -1690,6 +1827,18 @@ window.setFeedbackRefer = (value) => {
   const noBtn = document.getElementById("fb-refer-no");
   if (yesBtn) yesBtn.classList.toggle("btn-primary", value === true);
   if (noBtn) noBtn.classList.toggle("btn-primary", value === false);
+  _updateFeedbackSubmitState();
+};
+
+// fix15 §5.2: кнопка «Отправить» задизейблена, пока не заполнено хотя бы
+// одно поле — не даём отправить полностью пустую форму.
+window._updateFeedbackSubmitState = () => {
+  const other = (document.getElementById("fb-premium-other") || {}).value?.trim() || "";
+  const contact = (document.getElementById("fb-contact") || {}).value?.trim() || "";
+  const hasAnything = !!_fbUsageType || _fbPremiumFeatures.size > 0 || !!other
+    || _fbRefer !== null || !!contact;
+  const btn = document.getElementById("feedback-submit-btn");
+  if (btn) btn.disabled = !hasAnything;
 };
 
 function showFeedbackMsg(text, type) {
@@ -1700,17 +1849,13 @@ function showFeedbackMsg(text, type) {
 }
 
 window.submitFeedback = async () => {
-  const feature = (document.getElementById("fb-feature") || {}).value?.trim() || "";
-  if (!feature) {
-    showFeedbackMsg("Опишите фичу — это единственное обязательное поле", "error");
-    return;
-  }
-  const source = (document.getElementById("fb-source") || {}).value?.trim() || "";
+  const premiumOther = (document.getElementById("fb-premium-other") || {}).value?.trim() || "";
   const contact = (document.getElementById("fb-contact") || {}).value?.trim() || "";
 
   const payload = {
-    feature_request: feature,
-    source: source || null,
+    usage_type: _fbUsageType,
+    premium_features: Array.from(_fbPremiumFeatures),
+    premium_features_other: premiumOther || null,
     would_refer: _fbRefer,
     contact: contact || null,
   };
@@ -1753,12 +1898,14 @@ function _updateToolbarActions() {
   const manualBtn = document.getElementById('btn-manual-place');
   const eraseBtn = document.getElementById('btn-erase-page');
   const dl = document.getElementById('btn-download');
+  const shd = document.getElementById('btn-share-deal');
   const sh = document.getElementById('btn-share');
 
   if (rememberBtn) rememberBtn.classList.toggle('disabled', !hasAnalyzed);
   if (manualBtn) manualBtn.classList.toggle('disabled', !_workSigReady);
   if (eraseBtn) eraseBtn.classList.toggle('disabled', !hasSigned);
   if (dl) dl.classList.toggle('disabled', !hasSigned);
+  if (shd) shd.classList.toggle('disabled', !_currentDeal);
   if (sh) {
     // navigator.canShare — возможность браузера, не состояние документа:
     // если её вообще нет, кнопку прячем совсем, а не тускним без толку.
