@@ -149,15 +149,28 @@
     color: var(--c-muted); font-size: 13px; padding: 1.75rem 1.5rem; overflow: hidden; }
   .pdf-preview-empty-title { font-size: 15px; font-weight: 600; color: var(--c-text);
     text-align: center; margin-bottom: 1.1rem; }
-  .pdf-preview-instructions { max-width: 460px; width: 100%; }
+  .pdf-preview-instructions { max-width: 560px; width: 100%; }
   .pdf-preview-instructions .point-up { font-size: 13px; color: var(--c-accent);
     text-align: center; margin-bottom: 1rem; }
-  .pdf-preview-instructions ol { margin: 0.75rem 0 0; padding-left: 1.15rem; display: flex;
-    flex-direction: column; gap: 0.7rem; }
-  .pdf-preview-instructions li { font-size: 13px; line-height: 1.55; color: var(--c-muted); }
-  .pdf-preview-instructions li b { color: var(--c-text); }
-  .icon-legend { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 0.25rem; }
-  .icon-legend-row { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 13px; color: var(--c-muted); line-height: 1.45; }
+  /* fix17 §1: главное (как работать) наверх и горизонтально — было спрятано
+     под второстепенным (справочник иконок), экран тянулся вниз пустым. */
+  .onboarding-steps { display: grid; grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 0.5rem; margin-bottom: 1.25rem; }
+  .onboarding-step { border: 1px solid var(--c-border); border-radius: 10px;
+    padding: 0.65rem 0.5rem; text-align: center; background: var(--c-surface); }
+  .onboarding-step-accent { background: var(--c-accent-bg); border-color: var(--c-accent); }
+  .onboarding-step-num { width: 20px; height: 20px; line-height: 20px; border-radius: 50%;
+    background: var(--c-bg); color: var(--c-muted); font-size: 11px; font-weight: 600;
+    margin: 0 auto 0.4rem; }
+  .onboarding-step-accent .onboarding-step-num { background: var(--c-accent); color: #fff; }
+  .onboarding-step-title { font-size: 13px; font-weight: 600; color: var(--c-text); margin-bottom: 0.15rem; }
+  .onboarding-step-sub { font-size: 11px; color: var(--c-muted); line-height: 1.3; }
+  .onboarding-footer-note { margin-top: 1rem; font-size: 12px; color: var(--c-muted); text-align: center; }
+  /* fix17 §1: справочник иконок — второстепенное, в две колонки вместо
+     длинной колонки в одну ширину; тексты сокращены до одной строки. */
+  .icon-legend { display: grid; grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 0.5rem 1rem; margin-bottom: 0.25rem; }
+  .icon-legend-row { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 12px; color: var(--c-muted); line-height: 1.4; }
   .icon-legend-row b { color: var(--c-text); }
   .inst-icon { display: inline-flex; align-items: center; justify-content: center;
     width: 26px; height: 26px; flex-shrink: 0; border: 1px solid var(--c-border);
@@ -172,6 +185,15 @@
   .icon-btn svg { width: 16px; height: 16px; display: block; }
   .icon-btn.active { color: var(--c-accent); border-color: var(--c-accent); background: var(--c-accent-bg); }
   #btn-remember.active svg { fill: currentColor; }
+  /* fix17 §2: цвет hover по смыслу действия — .icon-btn.disabled уже сам
+     отключает pointer-events, так что :hover ниже физически не сработает
+     мышью, пока кнопка неактивна (см. правило выше). */
+  #btn-remember:hover { color: #BA7517; }
+  #btn-manual-place:hover { color: #378ADD; }
+  #btn-erase-page:hover { color: #E24B4A; }
+  #btn-download:hover { color: #639922; }
+  #btn-share-deal:hover { color: #7F77DD; }
+  #btn-share:hover { color: #5F5E5A; }
   /* Fix-20: инструменты всегда видны — неактивные тускнеют, а не пропадают */
   .icon-btn.disabled { opacity: 0.35; cursor: default; pointer-events: none; }
 
@@ -609,38 +631,58 @@ const TABS = {
         <div class="pdf-preview-empty" id="pdf-preview-empty">
           <div class="pdf-preview-empty-title">📄 Здесь появится предпросмотр документа</div>
           <div class="pdf-preview-instructions">
+            <div class="onboarding-steps">
+              <div class="onboarding-step">
+                <div class="onboarding-step-num">1</div>
+                <div class="onboarding-step-title">Профиль</div>
+                <div class="onboarding-step-sub">ФИО и образец подписи</div>
+              </div>
+              <div class="onboarding-step">
+                <div class="onboarding-step-num">2</div>
+                <div class="onboarding-step-title">Договор</div>
+                <div class="onboarding-step-sub">Места подписи найдутся сами</div>
+              </div>
+              <div class="onboarding-step">
+                <div class="onboarding-step-num">3</div>
+                <div class="onboarding-step-title">Проверка</div>
+                <div class="onboarding-step-sub">Добавьте или уберите подпись</div>
+              </div>
+              <div class="onboarding-step onboarding-step-accent">
+                <div class="onboarding-step-num">4</div>
+                <div class="onboarding-step-title">Контрагенту</div>
+                <div class="onboarding-step-sub">Он подпишет без регистрации</div>
+              </div>
+            </div>
+
             <div class="point-up">Значки справа вверху — инструменты для работы с подписями</div>
             <div class="icon-legend">
               <div class="icon-legend-row">
                 <span class="inst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>
-                <span><b>Запомнить шаблон</b> — система запомнит расстановку подписей и при следующей загрузке похожего документа применит их автоматически</span>
+                <span><b>Запомнить шаблон</b> — применит расстановку к похожим</span>
               </div>
               <div class="icon-legend-row">
                 <span class="inst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
-                <span><b>Добавить подпись вручную</b> — нажмите, затем кликните на нужное место в документе</span>
+                <span><b>Добавить подпись</b> — кликните на место в документе</span>
               </div>
               <div class="icon-legend-row">
                 <span class="inst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8l-6-6a2 2 0 0 1 0-2.83l8.59-8.59a2 2 0 0 1 2.82 0l6 6a2 2 0 0 1 0 2.83L13 18"/><path d="M8 20L3.5 15.5"/></svg></span>
-                <span><b>Убрать подпись</b> — удаляет подпись на текущей странице</span>
+                <span><b>Убрать подпись</b> — лишняя на текущей странице</span>
               </div>
               <div class="icon-legend-row">
                 <span class="inst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></span>
-                <span><b>Скачать</b> подписанный документ</span>
+                <span><b>Скачать</b> — готовый подписанный PDF</span>
               </div>
               <div class="icon-legend-row">
                 <span class="inst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2"/></svg></span>
-                <span><b>Передать контрагенту</b> — ссылка на подпись без регистрации: Telegram, WhatsApp или просто скопировать</span>
+                <span><b>Передать контрагенту</b> — ссылка в Telegram, WhatsApp</span>
               </div>
               <div class="icon-legend-row">
                 <span class="inst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></span>
-                <span><b>Поделиться файлом</b> — экспорт самого PDF в другое приложение</span>
+                <span><b>Поделиться файлом</b> — экспорт PDF в другое приложение</span>
               </div>
             </div>
-            <ol>
-              <li><b>Загрузите подпись и данные.</b> В разделе «Профиль» укажите ФИО (или название компании) и образец подписи.</li>
-              <li><b>Загрузите договор.</b> Места для подписи система найдёт сама. Не хватает — добавьте вручную; лишняя — уберите ластиком.</li>
-              <li><b>Скачайте или отправьте</b> подписанный документ прямо из этого окна.</li>
-            </ol>
+
+            <div class="onboarding-footer-note">Статус каждой отправленной сделки — в разделе «Мои сделки»</div>
           </div>
         </div>
       </div>
@@ -669,20 +711,17 @@ const TABS = {
         <div style="font-size:14px;font-weight:500;margin:1rem 0 0.4rem">За какую из этих фич вы готовы платить?</div>
         <div class="fb-toggle-group" id="fb-premium-features-group">
           <button type="button" class="btn fb-toggle-btn" data-value="local_deployment" onclick="toggleFeedbackPremiumFeature('local_deployment')">Локальная установка — документы не покидают вашу инфраструктуру</button>
-          <button type="button" class="btn fb-toggle-btn" data-value="two_sided_signing" onclick="toggleFeedbackPremiumFeature('two_sided_signing')">Двустороннее подписание через сервис</button>
           <button type="button" class="btn fb-toggle-btn" data-value="higher_limits" onclick="toggleFeedbackPremiumFeature('higher_limits')">Расширенные лимиты объёма документов</button>
           <button type="button" class="btn fb-toggle-btn" data-value="api_integrations" onclick="toggleFeedbackPremiumFeature('api_integrations')">API/интеграции (Cursor, Claude Desktop и т.п.)</button>
-          <button type="button" class="btn fb-toggle-btn" data-value="team_access" onclick="toggleFeedbackPremiumFeature('team_access')">Командный доступ — несколько сотрудников на аккаунт</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="mailbox_integration" onclick="toggleFeedbackPremiumFeature('mailbox_integration')">Интеграция с почтовым ящиком и обработка в фоновом режиме</button>
         </div>
         <input class="input" id="fb-premium-other" placeholder="Другое (необязательно)" oninput="_updateFeedbackSubmitState()" style="margin-top:0.5rem">
 
-        <div style="font-size:14px;font-weight:500;margin:1rem 0 0.4rem">Порекомендовали бы коллеге?</div>
+        <div style="font-size:14px;font-weight:500;margin:1rem 0 0.4rem">Вы уже порекомендовали коллеге?</div>
         <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
           <button type="button" class="btn" id="fb-refer-yes" onclick="setFeedbackRefer(true)" style="width:auto;flex:1">Да</button>
           <button type="button" class="btn" id="fb-refer-no" onclick="setFeedbackRefer(false)" style="width:auto;flex:1">Нет</button>
         </div>
-        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">Контакт (необязательно)</div>
-        <input class="input" id="fb-contact" placeholder="email, телефон, telegram..." oninput="_updateFeedbackSubmitState()">
         <button class="btn btn-primary" id="feedback-submit-btn" onclick="submitFeedback()" style="margin-top:0.25rem" disabled>Отправить</button>
       </div>
     </div>`,
@@ -1784,12 +1823,12 @@ window.downloadDealFinalPdf = async (dealId, evt) => {
 
 // ── Deal Cycle (E6): "Что улучшить?" опросник → Telegram ────────────────────
 
-let _fbRefer = null;
+let _fbHasReferred = null;
 let _fbUsageType = null;
 let _fbPremiumFeatures = new Set();
 
 function initFeedbackTab() {
-  _fbRefer = null;
+  _fbHasReferred = null;
   _fbUsageType = null;
   _fbPremiumFeatures = new Set();
   const yesBtn = document.getElementById("fb-refer-yes");
@@ -1800,8 +1839,6 @@ function initFeedbackTab() {
     .forEach((btn) => btn.classList.remove("btn-primary"));
   const other = document.getElementById("fb-premium-other");
   if (other) other.value = "";
-  const contact = document.getElementById("fb-contact");
-  if (contact) contact.value = "";
   _updateFeedbackSubmitState();
 }
 
@@ -1822,7 +1859,7 @@ window.toggleFeedbackPremiumFeature = (value) => {
 };
 
 window.setFeedbackRefer = (value) => {
-  _fbRefer = value;
+  _fbHasReferred = value;
   const yesBtn = document.getElementById("fb-refer-yes");
   const noBtn = document.getElementById("fb-refer-no");
   if (yesBtn) yesBtn.classList.toggle("btn-primary", value === true);
@@ -1832,11 +1869,11 @@ window.setFeedbackRefer = (value) => {
 
 // fix15 §5.2: кнопка «Отправить» задизейблена, пока не заполнено хотя бы
 // одно поле — не даём отправить полностью пустую форму.
+// fix17 §3.1: contact убран — email уже приходит из UserDep на бэкенде.
 window._updateFeedbackSubmitState = () => {
   const other = (document.getElementById("fb-premium-other") || {}).value?.trim() || "";
-  const contact = (document.getElementById("fb-contact") || {}).value?.trim() || "";
   const hasAnything = !!_fbUsageType || _fbPremiumFeatures.size > 0 || !!other
-    || _fbRefer !== null || !!contact;
+    || _fbHasReferred !== null;
   const btn = document.getElementById("feedback-submit-btn");
   if (btn) btn.disabled = !hasAnything;
 };
@@ -1850,14 +1887,12 @@ function showFeedbackMsg(text, type) {
 
 window.submitFeedback = async () => {
   const premiumOther = (document.getElementById("fb-premium-other") || {}).value?.trim() || "";
-  const contact = (document.getElementById("fb-contact") || {}).value?.trim() || "";
 
   const payload = {
     usage_type: _fbUsageType,
     premium_features: Array.from(_fbPremiumFeatures),
     premium_features_other: premiumOther || null,
-    would_refer: _fbRefer,
-    contact: contact || null,
+    has_referred: _fbHasReferred,
   };
 
   let res;
