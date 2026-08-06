@@ -52,6 +52,12 @@
   .verify-card h2 { font-size: 20px; margin-bottom: 0.5rem; }
   .verify-card p { color: var(--c-muted); font-size: 14px; margin-bottom: 1.5rem; line-height: 1.6; }
 
+  /* ── terms-acceptance screen (fix21) — same card as verify screen ── */
+  #screen-terms { align-items: center; justify-content: center; padding: 1.5rem; }
+  .terms-consent-row { display: flex; align-items: flex-start; gap: 0.6rem; margin: 0 0 1.5rem; font-size: 13px; color: var(--c-text); line-height: 1.5; text-align: left; }
+  .terms-consent-row input[type=checkbox] { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; }
+  .terms-consent-row a { color: var(--c-accent); }
+
   /* ── cabinet ── */
   #screen-cabinet { flex-direction: column; }
   .topbar { background: var(--c-surface); border-bottom: 1px solid var(--c-border); padding: 0 1.5rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
@@ -323,6 +329,23 @@
   </div>
 </div>
 
+<!-- ── Terms-acceptance gate screen (fix21) ── -->
+<div id="screen-terms" class="screen">
+  <div class="verify-card">
+    <div style="font-size:48px; margin-bottom:1rem">📄</div>
+    <h2>Условия использования</h2>
+    <p>Прежде чем продолжить, подтвердите согласие с условиями сервиса.</p>
+    <label class="terms-consent-row">
+      <input type="checkbox" id="terms-consent-checkbox" onchange="updateTermsButtonState()">
+      Я принимаю <a href="/terms" target="_blank">Оферту</a>,
+      <a href="/privacy" target="_blank">Политику конфиденциальности</a> и
+      <a href="/cookies" target="_blank">Cookie-политику</a>
+    </label>
+    <button class="btn btn-primary" id="btn-accept-terms" onclick="acceptTerms()" disabled>Продолжить</button>
+    <button class="form-link" onclick="signOut()">Выйти</button>
+  </div>
+</div>
+
 <!-- ── Cabinet screen ── -->
 <div id="screen-cabinet" class="screen">
   <div class="topbar">
@@ -451,6 +474,26 @@ onAuthStateChanged(auth, async (user) => {
     showScreen("verify");
     return;
   }
+
+  // fix21: terms-acceptance gate. Unlike emailVerified (a property already
+  // on the Firebase user object, no network call needed), there's no
+  // client-side signal for this — GET /v1/me is the only way to know.
+  // On a network failure here we fail OPEN (proceed to cabinet) rather than
+  // lock the user out on a transient hiccup; POST /me/accept-terms is the
+  // one that actually has to succeed to skip the gate on the next login.
+  try {
+    const meRes = await apiFetch("/v1/me");
+    if (meRes.ok) {
+      const me = await meRes.json();
+      if (!me.terms_accepted) {
+        showScreen("terms");
+        return;
+      }
+    }
+  } catch (e) {
+    console.error("GET /v1/me failed:", e);
+  }
+
   idToken = await user.getIdToken();
   document.getElementById("topbar-email").textContent = user.email;
   showScreen("cabinet");
@@ -460,6 +503,30 @@ onAuthStateChanged(auth, async (user) => {
     if (window.posthog) posthog.capture("signup_completed");
   }
 });
+
+window.updateTermsButtonState = () => {
+  const cb = document.getElementById("terms-consent-checkbox");
+  const btn = document.getElementById("btn-accept-terms");
+  if (btn) btn.disabled = !(cb && cb.checked);
+};
+
+window.acceptTerms = async () => {
+  const btn = document.getElementById("btn-accept-terms");
+  if (btn) btn.disabled = true;
+  try {
+    const res = await apiFetch("/v1/me/accept-terms", { method: "POST" });
+    if (!res.ok) throw new Error("accept-terms failed: " + res.status);
+  } catch (e) {
+    console.error("acceptTerms failed:", e);
+    alert("Не удалось сохранить согласие, попробуйте ещё раз");
+    if (btn) btn.disabled = false;
+    return;
+  }
+  idToken = await currentUser.getIdToken();
+  document.getElementById("topbar-email").textContent = currentUser.email;
+  showScreen("cabinet");
+  showTab("profile");
+};
 
 // ── Navigation ─────────────────────────────────────────────────────────────
 window.showScreen = (name) => {
