@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>SignFinder — Simple Electronic Signature (PEP) Agreement</title>
+<title>SignFinder — Electronic Signature Agreement (Simple Electronic Signature)</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -29,10 +29,13 @@
   .card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: var(--shadow); }
 
   h1 { font-size: 20px; margin-bottom: 0.5rem; }
+  h2 { font-size: 15px; margin: 1.25rem 0 0.5rem; }
   p { margin-bottom: 0.75rem; }
   p:last-child { margin-bottom: 0; }
 
-  .pending-notice { font-size: 13px; color: var(--c-muted); background: var(--c-bg); border-radius: 8px; padding: 0.85rem; line-height: 1.5; }
+  .disclaimer { font-size: 12px; color: var(--c-muted); background: var(--c-bg); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; line-height: 1.5; }
+  .draft-notice { font-size: 13px; color: var(--c-danger); background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem; line-height: 1.5; }
+  .consent-text { font-size: 14px; line-height: 1.6; background: var(--c-accent-bg); border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.85rem; }
 
   .footer-note { text-align: center; font-size: 11px; color: var(--c-muted); margin-top: 1.5rem; }
   .footer-note a { color: var(--c-muted); }
@@ -44,20 +47,78 @@
 
 <div class="wrap">
   <div class="card">
-    <h1>Simple Electronic Signature (PEP) Agreement</h1>
-    <p class="pending-notice">
-      [EN CONTENT PENDING — юрисдикционное основание для англоязычных
-      контрагентов ещё не решено (см. TASK_i18n_en.md §0). Не переводить
-      RU-версию дословно — возможно другая юр. база, не просто языковая
-      разница. Ждёт отдельного решения владельца.]
+    <h1>Electronic Signature Agreement (Simple Electronic Signature)</h1>
+
+    <div class="draft-notice">
+      ⚠️ This is a draft version of this document, prepared by the service,
+      and it has not yet been reviewed by a lawyer. Do not treat the text
+      below as final legal advice — in the event of a dispute, applicable law
+      and the terms of the specific agreement between the parties will govern.
+    </div>
+
+    <div class="draft-notice">
+      🌐 This English version is a direct translation of the Russian-language
+      original, which relies specifically on Russian Federal Law No. 63-FZ
+      "On Electronic Signatures" as its legal basis. If you are located
+      outside Russia, this legal basis may not be the correct one for your
+      jurisdiction — this question has not yet been resolved by the operator.
+      Please treat this document as informational only until it is updated.
+    </div>
+
+    <h2>Consent text signed by the counterparty</h2>
+    <p class="consent-text">
+      I agree that the signature placed on this document constitutes a
+      simple electronic signature within the meaning of Article 5 of Federal
+      Law No. 63-FZ, and I acknowledge it as equivalent to a handwritten
+      signature on a paper document.
+    </p>
+
+    <h2>What is a simple electronic signature (SES)</h2>
+    <p>
+      A simple electronic signature is one of the types of electronic
+      signature provided for by Federal Law No. 63-FZ "On Electronic
+      Signatures." Under Article 5 of this law, an SES confirms the fact that
+      an electronic signature was created by a specific person. The parties
+      to an agreement may agree to treat a document signed with an SES as
+      equivalent to a document signed by hand on paper — this is exactly the
+      consent recorded by the checkbox on the signing page.
+    </p>
+
+    <h2>How the signature is created in SignFinder</h2>
+    <p>
+      The counterparty receives a temporary link to the document, reviews it,
+      provides a signature (photo, uploaded file, or hand-drawn), and
+      confirms agreement with the terms above. The service records in the
+      legal block of the final PDF: the initiator's email address, the date
+      and time each party signed, the IP address and browser/device
+      information for each party, and the method the counterparty used to
+      provide their signature — together, this forms the audit trail of the
+      signing.
+    </p>
+
+    <h2>Document storage</h2>
+    <p>
+      Deal documents (the original, the version with the initiator's
+      signature, and the final signed version) are stored for 7 days from the
+      moment the deal is created, after which they are automatically deleted
+      from SignFinder's servers — regardless of whether the counterparty has
+      signed. During these 7 days, the link to the signed document remains
+      available for viewing and downloading. We recommend downloading the
+      final PDF to your own device immediately after signing rather than
+      relying on the link remaining available later.
+    </p>
+
+    <h2>Questions</h2>
+    <p>
+      If you have questions about this document or the signing process,
+      contact us on Telegram
+      <a href="https://t.me/SingFinder" target="_blank">@SignFinder</a>
+      or at <a href="mailto:alexgeorg2507@gmail.com">alexgeorg2507@gmail.com</a>.
     </p>
   </div>
 
   <div class="footer-note">
-    <a href="terms-en.html" target="_blank">Terms</a> ·
-    <a href="privacy-en.html" target="_blank">Privacy</a> ·
-    <a href="cookies-en.html" target="_blank">Cookies</a>
-    <br>powered by SignFinder
+    powered by SignFinder
   </div>
 </div>
 
