@@ -798,8 +798,8 @@ const TABS = {
     </div>`,
 
   deals: `
-    <div class="section-title">Мои сделки</div>
-    <div class="section-sub">Статус переданных на подпись договоров</div>
+    <div class="section-title" data-i18n="nav_deals">Мои сделки</div>
+    <div class="section-sub" data-i18n="deals_sub">Статус переданных на подпись договоров</div>
     <div id="deals-msg" class="msg"></div>
     <div id="deals-list"></div>`,
 
@@ -1719,12 +1719,12 @@ window.shareViaWhatsApp = () => {
 // ── Deal Cycle (E4): "Мои сделки" ───────────────────────────────────────────
 
 const _DEAL_STATUS_PILL = {
-  draft:    { cls: "neutral", label: "Черновик" },
-  sent:     { cls: "neutral", label: "Отправлено" },
-  viewed:   { cls: "yellow",  label: "Контрагент открыл" },
-  signed:   { cls: "green",   label: "Подписано" },
-  expired:  { cls: "red",     label: "Истекло" },
-  rejected: { cls: "red",     label: "Отклонено" },
+  draft:    { cls: "neutral", key: "deal_status_draft" },
+  sent:     { cls: "neutral", key: "deal_status_sent" },
+  viewed:   { cls: "yellow",  key: "deal_status_viewed" },
+  signed:   { cls: "green",   key: "deal_status_signed" },
+  expired:  { cls: "red",     key: "deal_status_expired" },
+  rejected: { cls: "red",     key: "deal_status_rejected" },
 };
 
 const _DEAL_CHANNEL_ICON = { copy_link: "📋", telegram: "✈️", whatsapp: "📱" };
@@ -1734,7 +1734,7 @@ let _dealsCache = [];
 async function initDealsTab() {
   const listEl = document.getElementById("deals-list");
   if (!listEl) return;
-  listEl.innerHTML = '<p class="hint">Загрузка…</p>';
+  listEl.innerHTML = `<p class="hint">${t("sign_loading")}</p>`;
   showDealsMsg("", "");
 
   let res;
@@ -1742,12 +1742,12 @@ async function initDealsTab() {
     res = await apiFetch("/v1/deals?limit=50");
   } catch {
     listEl.innerHTML = "";
-    showDealsMsg("Ошибка соединения", "error");
+    showDealsMsg(t("sign_err_connection"), "error");
     return;
   }
   if (!res.ok) {
     listEl.innerHTML = "";
-    showDealsMsg("Не удалось загрузить сделки", "error");
+    showDealsMsg(t("deals_load_failed"), "error");
     return;
   }
   _dealsCache = await res.json();
@@ -1762,7 +1762,7 @@ function showDealsMsg(text, type) {
 }
 
 function _formatDealDate(iso) {
-  return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  return new Date(iso).toLocaleDateString(currentLang === "en" ? "en-US" : "ru-RU", { day: "numeric", month: "long" });
 }
 
 function _ruDaysWord(n) {
@@ -1774,31 +1774,33 @@ function _ruDaysWord(n) {
 
 function _dealExpiryLabel(expiresAt) {
   const diffMs = new Date(expiresAt) - new Date();
-  if (diffMs <= 0) return "истекла";
+  if (diffMs <= 0) return t("deal_expired_label");
   const days = Math.ceil(diffMs / 86400000);
-  return `истекает через ${days} ${_ruDaysWord(days)}`;
+  const word = currentLang === "en" ? (days === 1 ? "day" : "days") : _ruDaysWord(days);
+  return `${t("deal_expires_in")} ${days} ${word}`;
 }
 
 function renderDealsList() {
   const listEl = document.getElementById("deals-list");
   if (!listEl) return;
   if (!_dealsCache.length) {
-    listEl.innerHTML = '<p class="hint">Сделок пока нет — подпишите договор во вкладке «Подписать договор», появится кнопка передачи контрагенту.</p>';
+    listEl.innerHTML = `<p class="hint">${t("deals_empty")}</p>`;
     return;
   }
   listEl.innerHTML = _dealsCache.map((d) => {
-    const pill = _DEAL_STATUS_PILL[d.status] || { cls: "neutral", label: d.status };
+    const pill = _DEAL_STATUS_PILL[d.status] || { cls: "neutral", key: null };
+    const pillLabel = pill.key ? t(pill.key) : d.status;
     const channelIcon = d.share_channel_used ? (_DEAL_CHANNEL_ICON[d.share_channel_used] || "") : "—";
-    const fileName = d.original_filename || "Договор";
+    const fileName = d.original_filename || t("deals_default_filename");
     return `
       <div class="card" data-deal-id="${d.id}" onclick="toggleDealDetail('${d.id}')" style="cursor:pointer;position:relative">
-        <button class="deal-hide-btn" onclick="hideDeal('${d.id}', event)" title="Скрыть из списка" aria-label="Скрыть из списка">✕</button>
+        <button class="deal-hide-btn" onclick="hideDeal('${d.id}', event)" title="${t('deals_hide_title')}" aria-label="${t('deals_hide_title')}">✕</button>
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;padding-right:1.75rem">
           <div>
             <div style="font-size:14px;font-weight:500">${_escapeHtml(fileName)}</div>
             <div style="font-size:12px;color:var(--c-muted)">${_formatDealDate(d.created_at)} · ${_dealExpiryLabel(d.expires_at)} · ${channelIcon}</div>
           </div>
-          <div class="traffic-pill ${pill.cls}" style="margin-bottom:0">${pill.label}</div>
+          <div class="traffic-pill ${pill.cls}" style="margin-bottom:0">${pillLabel}</div>
         </div>
         <div id="deal-detail-${d.id}" class="deal-detail" style="display:none;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--c-border)"></div>
       </div>`;
@@ -1812,12 +1814,12 @@ window.hideDeal = async (dealId, evt) => {
     res = await apiFetch(`/v1/deals/${dealId}/hide`, { method: "POST" });
   } catch (e) {
     console.error("hideDeal failed:", e);
-    showDealsMsg("Ошибка соединения", "error");
+    showDealsMsg(t("sign_err_connection"), "error");
     return;
   }
   if (!res.ok) {
     console.error("hideDeal failed:", res.status);
-    showDealsMsg("Не удалось скрыть сделку", "error");
+    showDealsMsg(t("deals_hide_failed"), "error");
     return;
   }
   // Крестик прячет сделку из списка (hidden_by_initiator), а не удаляет её —
@@ -1836,18 +1838,18 @@ window.toggleDealDetail = async (dealId) => {
   detailEl.style.display = opening ? "block" : "none";
   if (!opening || detailEl.dataset.loaded) return;
 
-  detailEl.innerHTML = '<p class="hint">Загрузка…</p>';
+  detailEl.innerHTML = `<p class="hint">${t("sign_loading")}</p>`;
   let res;
   try {
     res = await apiFetch(`/v1/deals/${dealId}`);
   } catch (e) {
     console.error("GET /v1/deals/{id} failed:", e);
-    detailEl.innerHTML = '<p class="hint" style="color:var(--c-danger)">Ошибка соединения</p>';
+    detailEl.innerHTML = `<p class="hint" style="color:var(--c-danger)">${t("sign_err_connection")}</p>`;
     return;
   }
   if (!res.ok) {
     console.error("GET /v1/deals/{id} failed:", res.status);
-    detailEl.innerHTML = '<p class="hint" style="color:var(--c-danger)">Не удалось загрузить детали</p>';
+    detailEl.innerHTML = `<p class="hint" style="color:var(--c-danger)">${t("deals_detail_load_failed")}</p>`;
     return;
   }
   const deal = await res.json();
@@ -1855,19 +1857,19 @@ window.toggleDealDetail = async (dealId) => {
   detailEl.innerHTML = _renderDealDetail(deal);
 };
 
-const _AUDIT_EVENT_LABEL = {
-  created: "Сделка создана",
-  sent: "Ссылка передана контрагенту",
-  viewed: "Контрагент открыл ссылку",
-  signed: "Контрагент подписал",
+const _AUDIT_EVENT_KEY = {
+  created: "audit_created",
+  sent: "audit_sent",
+  viewed: "audit_viewed",
+  signed: "audit_signed",
 };
 
 function _renderDealDetail(deal) {
   const timeline = (deal.audit_log || []).map((ev) => {
-    const label = _AUDIT_EVENT_LABEL[ev.event] || ev.event;
-    const when = new Date(ev.at).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+    const label = _AUDIT_EVENT_KEY[ev.event] ? t(_AUDIT_EVENT_KEY[ev.event]) : ev.event;
+    const when = new Date(ev.at).toLocaleString(currentLang === "en" ? "en-US" : "ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
     return `<div style="font-size:13px;padding:0.2rem 0"><b>${label}</b> — ${when}</div>`;
-  }).join("") || '<p class="hint">Событий пока нет.</p>';
+  }).join("") || `<p class="hint">${t("deals_no_events")}</p>`;
 
   // draft тоже попадает сюда (подписал, ни разу не нажал кнопку передачи
   // в E3-блоке) — единственный способ вернуться к передаче такой сделки.
@@ -1875,14 +1877,14 @@ function _renderDealDetail(deal) {
   const canDownload = deal.status === "signed" && deal.has_final_pdf;
 
   const downloadBtn = canDownload
-    ? `<button class="btn" onclick="downloadDealFinalPdf('${deal.id}', event)">Скачать финальный PDF</button>`
+    ? `<button class="btn" onclick="downloadDealFinalPdf('${deal.id}', event)">${t("sign_download_final")}</button>`
     : "";
   const reshareBtn = canReshare
-    ? `<button class="btn" onclick="copyDealLinkAgain('${deal.id}', event)">📋 Скопировать ссылку ещё раз</button>`
+    ? `<button class="btn" onclick="copyDealLinkAgain('${deal.id}', event)">${t("deals_copy_link_again")}</button>`
     : "";
 
   return `
-    <div style="font-size:13px;font-weight:600;margin-bottom:0.4rem">История</div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:0.4rem">${t("deals_history_title")}</div>
     ${timeline}
     <div id="deal-detail-status-${deal.id}" style="font-size:12px;color:var(--c-muted);margin:0.4rem 0;min-height:1em"></div>
     <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap">${downloadBtn}${reshareBtn}</div>`;
@@ -1906,7 +1908,7 @@ window.copyDealLinkAgain = async (dealId, evt) => {
   const deal = await res.json();
   try {
     await navigator.clipboard.writeText(deal.share_url);
-    if (statusEl) statusEl.textContent = "✓ Ссылка скопирована";
+    if (statusEl) statusEl.textContent = t("deals_link_copied");
   } catch (e) {
     console.error("clipboard write failed:", e);
     if (statusEl) statusEl.textContent = deal.share_url;
