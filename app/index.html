@@ -578,48 +578,48 @@ window.showScreen = (name) => {
 
 const TABS = {
   profile: `
-    <div class="section-title">Профиль</div>
-    <div class="section-sub">Ваши данные, по которым я ищу место подписи</div>
+    <div class="section-title" data-i18n="nav_profile">Профиль</div>
+    <div class="section-sub" data-i18n="profile_sub">Ваши данные, по которым я ищу место подписи</div>
     <div class="card" id="profile-card">
       <div id="profile-msg" class="msg"></div>
-      <input class="input" id="pf-name" placeholder="ФИО подписанта для поиска подписи">
-      <input class="input" id="pf-company" placeholder="Именование компании в договоре (для юрлиц)">
-      <div class="hint" style="margin-top:0.25rem">Данные сохраняются автоматически</div>
+      <input class="input" id="pf-name" data-i18n-placeholder="profile_name_placeholder" placeholder="ФИО подписанта для поиска подписи">
+      <input class="input" id="pf-company" data-i18n-placeholder="profile_company_placeholder" placeholder="Именование компании в договоре (для юрлиц)">
+      <div class="hint" style="margin-top:0.25rem" data-i18n="profile_autosave_hint">Данные сохраняются автоматически</div>
     </div>
     <div class="card">
-      <div style="font-size:15px;font-weight:600;margin-bottom:0.25rem">Подпись</div>
-      <div style="font-size:13px;color:var(--c-muted);margin-bottom:1rem">Будет проставляться на договоры автоматически</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:0.25rem" data-i18n="profile_sig_title">Подпись</div>
+      <div style="font-size:13px;color:var(--c-muted);margin-bottom:1rem" data-i18n="profile_sig_sub">Будет проставляться на договоры автоматически</div>
       <div id="sig-msg" class="msg"></div>
       <div id="sig-current"></div>
       <label class="upload-label">
-        📷 Загрузить или сфотографировать
+        <span data-i18n="profile_sig_upload_label">📷 Загрузить или сфотографировать</span>
         <input type="file" id="sig-file" accept="image/*" capture="environment" style="display:none">
       </label>
       <div class="hint" style="margin-top:0.5rem">
-        На телефоне открывает камеру. На десктопе — выбор файла.<br>
-        Подпись на белом листе, хорошее освещение.
+        <span data-i18n="profile_sig_upload_hint_1">На телефоне открывает камеру. На десктопе — выбор файла.</span><br>
+        <span data-i18n="sign_camera_hint">Подпись на белом листе, хорошее освещение.</span>
       </div>
       <div id="sig-processing" style="display:none;text-align:center;color:var(--c-muted);font-size:14px;padding:0.5rem 0">
-        ⏳ Обработка...
+        <span data-i18n="sign_processing">⏳ Обработка...</span>
       </div>
       <div id="sig-preview" style="display:none;margin-top:1rem">
         <div class="sig-grid">
           <div class="sig-col">
-            <div class="sig-col-label">Оригинал</div>
+            <div class="sig-col-label" data-i18n="sign_original">Оригинал</div>
             <img id="sig-original" class="sig-img">
           </div>
           <div class="sig-col">
-            <div class="sig-col-label">После обработки (прозрачный фон)</div>
+            <div class="sig-col-label" data-i18n="profile_sig_processed_transparent">После обработки (прозрачный фон)</div>
             <img id="sig-processed" class="sig-img sig-img-processed">
           </div>
         </div>
         <div id="sig-meta" class="sig-meta"></div>
-        <button class="btn btn-primary" onclick="saveSignature()" id="btn-save-sig">Сохранить подпись</button>
+        <button class="btn btn-primary" onclick="saveSignature()" id="btn-save-sig" data-i18n="profile_sig_save_btn">Сохранить подпись</button>
       </div>
     </div>
     <div id="profile-version-footer" style="margin-top:2rem;text-align:center;font-size:11px;color:var(--c-muted)"></div>
     <div style="text-align:center;font-size:11px;margin-top:0.4rem">
-      <a href="/pep-agreement" target="_blank" style="color:var(--c-muted)">Соглашение об ПЭП</a>
+      <a href="/pep-agreement" target="_blank" style="color:var(--c-muted)" data-i18n="sign_pep_agreement_link">Соглашение об ПЭП</a>
     </div>`,
 
   signature: `
@@ -847,6 +847,7 @@ window.showTab = (tab) => {
   closeMobileMenu();
   const mainEl = document.getElementById("main-content");
   mainEl.innerHTML = TABS[tab] || "";
+  applyI18n(mainEl);
   mainEl.classList.toggle("wide", tab === "work");
   if (tab === "profile")   { loadProfile(); initSignatureTab(); }
   if (tab === "party")     { loadParty(); }
@@ -955,7 +956,7 @@ window.saveProfile = async () => {
   };
   const res = await apiFetch("/v1/me/profile", { method: "PUT", body: JSON.stringify(body) });
   const ok = res.ok;
-  if (!ok) showTabMsg("profile-msg", "Ошибка сохранения", "error");
+  if (!ok) showTabMsg("profile-msg", t("err_save_failed"), "error");
   if (ok && window.posthog) posthog.capture("profile_filled");
 };
 
@@ -969,13 +970,13 @@ function initSignatureTab() {
 async function loadCurrentSignature() {
   const el = document.getElementById("sig-current");
   if (!el) return;
-  el.innerHTML = '<div style="font-size:13px;color:var(--c-muted);padding:0.5rem 0">⏳ Загружаем подпись...</div>';
+  el.innerHTML = `<div style="font-size:13px;color:var(--c-muted);padding:0.5rem 0">${t("profile_sig_loading")}</div>`;
   const token = await refreshToken();
   let res;
   try {
     res = await fetch("/api/v1/me/signature", { headers: { Authorization: "Bearer " + token } });
   } catch {
-    el.innerHTML = '<div style="font-size:13px;color:var(--c-danger);margin-bottom:0.75rem">⚠️ Нет связи с сервером</div>';
+    el.innerHTML = `<div style="font-size:13px;color:var(--c-danger);margin-bottom:0.75rem">${t("profile_sig_no_connection")}</div>`;
     return;
   }
   if (res.ok) {
@@ -983,14 +984,14 @@ async function loadCurrentSignature() {
     const url = URL.createObjectURL(blob);
     el.innerHTML = `
       <div style="margin-bottom:1rem">
-        <div class="sig-col-label" style="margin-bottom:0.4rem">Текущая подпись</div>
+        <div class="sig-col-label" style="margin-bottom:0.4rem">${t("profile_sig_current_label")}</div>
         <img src="${url}" class="sig-img sig-img-processed" style="max-height:72px">
-        <div class="sig-current-badge">✓ Подпись загружена</div>
+        <div class="sig-current-badge">${t("profile_sig_uploaded_badge")}</div>
       </div>`;
   } else if (res.status === 404) {
-    el.innerHTML = '<div style="font-size:13px;color:var(--c-muted);margin-bottom:0.75rem">Подпись ещё не загружена</div>';
+    el.innerHTML = `<div style="font-size:13px;color:var(--c-muted);margin-bottom:0.75rem">${t("profile_sig_not_uploaded")}</div>`;
   } else {
-    el.innerHTML = '<div style="font-size:13px;color:var(--c-danger);margin-bottom:0.75rem">⚠️ Не удалось загрузить текущую подпись</div>';
+    el.innerHTML = `<div style="font-size:13px;color:var(--c-danger);margin-bottom:0.75rem">${t("profile_sig_load_failed")}</div>`;
   }
 }
 
@@ -1013,7 +1014,7 @@ async function onSigFileChange(e) {
     res = await apiFetch("/v1/me/signature/process", { method: "POST", body: fd });
   } catch {
     document.getElementById("sig-processing").style.display = "none";
-    showTabMsg("sig-msg", "Ошибка соединения", "error");
+    showTabMsg("sig-msg", t("sign_err_connection"), "error");
     return;
   }
 
@@ -1021,7 +1022,7 @@ async function onSigFileChange(e) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    showTabMsg("sig-msg", err.detail || "Ошибка обработки", "error");
+    showTabMsg("sig-msg", err.detail || t("profile_sig_process_err"), "error");
     return;
   }
 
@@ -1036,30 +1037,30 @@ async function onSigFileChange(e) {
   const pct = Math.round((data.confidence || 0) * 100);
   const warns = (data.warnings || []).length
     ? "⚠️ " + data.warnings.join("; ")
-    : "✓ Обработка успешна";
-  document.getElementById("sig-meta").textContent = `Качество: ${pct}%  •  ${warns}`;
+    : t("sign_processing_success");
+  document.getElementById("sig-meta").textContent = `${t("sign_quality")}: ${pct}%  •  ${warns}`;
 }
 
 window.saveSignature = async () => {
   if (!_processedSigB64) return;
   const btn = document.getElementById("btn-save-sig");
-  if (btn) { btn.disabled = true; btn.textContent = "Сохранение..."; }
+  if (btn) { btn.disabled = true; btn.textContent = t("profile_sig_saving"); }
 
   const res = await apiFetch("/v1/me/signature", {
     method: "PUT",
     body: JSON.stringify({ png_b64: _processedSigB64 }),
   });
 
-  if (btn) { btn.disabled = false; btn.textContent = "Сохранить подпись"; }
+  if (btn) { btn.disabled = false; btn.textContent = t("profile_sig_save_btn"); }
 
   if (res.ok) {
-    showTabMsg("sig-msg", "Подпись сохранена", "success");
+    showTabMsg("sig-msg", t("profile_sig_saved"), "success");
     _processedSigB64 = null;
     document.getElementById("sig-preview").style.display = "none";
     loadCurrentSignature();  // refresh current badge
     if (window.posthog) posthog.capture("signature_uploaded");
   } else {
-    showTabMsg("sig-msg", "Ошибка сохранения", "error");
+    showTabMsg("sig-msg", t("err_save_failed"), "error");
   }
 };
 
