@@ -1219,7 +1219,7 @@ async function loadWorkUsage() {
   label.style.color = color;
   if (doc_count >= limit) {
     const uc = document.getElementById("work-upload-card");
-    if (uc) uc.innerHTML = '<div class="stub">Лимит исчерпан (10 документов в месяц).<br>Свяжитесь с нами для увеличения лимита.</div>';
+    if (uc) uc.innerHTML = `<div class="stub">${t("work_limit_exhausted_1")}<br>${t("work_limit_exhausted_2")}</div>`;
   }
 }
 
@@ -1244,10 +1244,10 @@ function _buildPreviewLabel(analyzeResult, filename) {
     const tplName = analyzeResult.template_name
       ? _truncateFilename(analyzeResult.template_name, 24)
       : (analyzeResult.template_id || '').slice(0, 8);
-    return `${fname} · Применён шаблон: ${tplName}`;
+    return `${fname} · ${t("work_template_applied")} ${tplName}`;
   }
   if (analyzeResult) {
-    return `${fname} · Распознано`;
+    return `${fname} · ${t("work_recognized")}`;
   }
   return fname;  // до завершения анализа — просто имя файла
 }
@@ -1275,7 +1275,7 @@ async function showPdfPreview(pdfBlobOrFile, pageNumber, label) {
   // element would give clientWidth=0 → a broken negative scale.
   scrollEl.style.display = 'flex';
   empty.style.display = 'none';
-  lbl.textContent = label || 'Предпросмотр';
+  lbl.textContent = label || t("work_preview_label");
   const infoStrip = document.getElementById('pdf-preview-info-strip');
   if (infoStrip) infoStrip.style.display = 'none';
 
@@ -1330,7 +1330,7 @@ async function showPdfPreview(pdfBlobOrFile, pageNumber, label) {
   if (myToken !== _currentRenderToken) return;
 
   scrollEl.replaceChildren(fragment);
-  if (pagesLbl) pagesLbl.textContent = pdf.numPages + ' стр.';
+  if (pagesLbl) pagesLbl.textContent = pdf.numPages + ' ' + t("work_pages_suffix");
 
   _attachPageObserver();
   if (_manualPlaceMode) _attachPlacementClickHandlers();
@@ -1364,7 +1364,7 @@ function _fallbackIframePreview(pdfBlobOrFile, pageNumber, label) {
   scrollEl.innerHTML = `<iframe src="${url}${page}" style="width:100%;flex:1;border:none;min-height:500px"></iframe>`;
   scrollEl.style.display = 'flex';
   if (empty) empty.style.display = 'none';
-  if (lbl) lbl.textContent = label || 'Предпросмотр';
+  if (lbl) lbl.textContent = label || t("work_preview_label");
   const infoStrip = document.getElementById('pdf-preview-info-strip');
   if (infoStrip) infoStrip.style.display = 'none';
 }
@@ -1378,7 +1378,7 @@ async function convertDocxToPdfBlob(file) {
   const res = await apiFetch("/v1/me/convert", { method: "POST", body: fd });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
-    throw new Error(e.detail || "Не удалось конвертировать документ");
+    throw new Error(e.detail || t("work_err_convert_failed"));
   }
   return await res.blob();
 }
@@ -1387,10 +1387,10 @@ async function handleWorkFile(file) {
   const lowerName = file.name.toLowerCase();
   const allowedExt = [".pdf", ".doc", ".docx"];
   if (!allowedExt.some(ext => lowerName.endsWith(ext))) {
-    return showWorkMsg("Только PDF, DOC, DOCX файлы", "error");
+    return showWorkMsg(t("work_err_bad_filetype"), "error");
   }
   if (file.size > 5 * 1024 * 1024) {
-    return showWorkMsg("Файл слишком большой (макс 5 МБ)", "error");
+    return showWorkMsg(t("work_err_file_too_big"), "error");
   }
   _workFile = file; _workAnchors = null;
   _signedBlob = null; _signedFilename = null;
@@ -1405,13 +1405,13 @@ async function handleWorkFile(file) {
   // signed output are identical. From this point on _workFile is the PDF.
   const isDocx = /\.(doc|docx)$/i.test(file.name);
   if (isDocx) {
-    showWorkSpinner("Конвертируем документ...");
+    showWorkSpinner(t("work_converting"));
     let pdfBlob;
     try {
       pdfBlob = await convertDocxToPdfBlob(file);
     } catch (e) {
       hideWorkSpinner();
-      return showWorkMsg(e.message || "Не удалось конвертировать документ", "error");
+      return showWorkMsg(e.message || t("work_err_convert_failed"), "error");
     }
     const baseName = file.name.replace(/\.[^.]+$/, "");
     _workFile = new File([pdfBlob], baseName + ".pdf", { type: "application/pdf" });
@@ -1420,28 +1420,28 @@ async function handleWorkFile(file) {
     showPdfPreview(file, 1, _buildPreviewLabel(null, _workFile.name));
   }
 
-  showWorkSpinner("Анализируем документ...");
+  showWorkSpinner(t("work_analyzing"));
 
   const fd = new FormData();
   fd.append("file", _workFile);
   let res;
   try { res = await apiFetch("/v1/me/analyze", { method: "POST", body: fd }); }
-  catch { hideWorkSpinner(); return showWorkMsg("Ошибка соединения", "error"); }
+  catch { hideWorkSpinner(); return showWorkMsg(t("sign_err_connection"), "error"); }
 
   hideWorkSpinner();
 
   if (res.status === 429) {
-    showWorkMsg("Лимит документов исчерпан на этот месяц", "error");
+    showWorkMsg(t("work_err_monthly_limit"), "error");
     if (window.posthog) posthog.capture("limit_reached", {step: "analyze"});
     return loadWorkUsage();
   }
   if (res.status === 413) {
     const e = await res.json().catch(() => ({}));
-    return showWorkMsg(e.detail || "Файл слишком большой", "error");
+    return showWorkMsg(e.detail || t("work_err_file_too_big_413"), "error");
   }
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
-    return showWorkMsg(e.detail || "Ошибка анализа", "error");
+    return showWorkMsg(e.detail || t("work_err_analyze_failed"), "error");
   }
 
   const result = await res.json();
@@ -1460,14 +1460,15 @@ async function handleWorkFile(file) {
   const n = _workAnchors.length;
   const signArea = document.getElementById("work-sign-area");
   if (n > 0 && _workSigReady) {
-    showWorkSpinner("Подписываем...");
+    showWorkSpinner(t("work_signing"));
     await workSign();
     hideWorkSpinner();
   } else if (n > 0 && !_workSigReady) {
+    const spotWord = currentLang === "en" ? (n === 1 ? "spot" : "spots") : (n === 1 ? "место" : "места/мест");
     if (signArea) signArea.innerHTML = `
       <div class="msg info" style="display:block; margin-top:0.5rem">
-        ✏️ Найдено ${n} ${n === 1 ? 'место' : 'места/мест'} для подписи.
-        Подпись не загружена — перейдите в раздел <strong>Подпись</strong> для загрузки.
+        ✏️ ${t("work_spots_found_prefix")} ${n} ${spotWord} ${t("work_spots_found_suffix")}
+        ${t("work_sig_not_uploaded_1")} <strong>${t("profile_sig_title")}</strong> ${t("work_sig_not_uploaded_2")}
       </div>`;
   }
 }
@@ -1491,18 +1492,18 @@ function renderAnalysisResult(result) {
   if (sideEl) {
     sideEl.innerHTML = displayName
       ? `<div style="font-size:14px;margin-bottom:0.4rem">
-           Наша сторона: <strong>${displayName}</strong>${alias ? `, алиас: <strong>${alias}</strong>` : ''}
+           ${t("work_our_side_label")} <strong>${displayName}</strong>${alias ? `, ${t("work_alias_label")} <strong>${alias}</strong>` : ''}
          </div>`
-      : `<div style="font-size:14px;color:var(--c-muted);margin-bottom:0.4rem">Сторона не распознана</div>`;
+      : `<div style="font-size:14px;color:var(--c-muted);margin-bottom:0.4rem">${t("work_side_not_recognized")}</div>`;
   }
 
   const n = _workAnchors.length;
   document.getElementById("work-anchor-info").textContent =
-    n > 0 ? `Мест для подписи: ${n}` : "Мест для подписи не найдено.";
+    n > 0 ? `${t("work_spots_count_label")} ${n}` : t("work_spots_none");
 
   const signArea = document.getElementById("work-sign-area");
   if (n === 0) {
-    signArea.innerHTML = `<p style="font-size:13px;color:var(--c-muted)">Попробуйте другой документ или шаблон подписи.</p>`;
+    signArea.innerHTML = `<p style="font-size:13px;color:var(--c-muted)">${t("work_try_another_doc")}</p>`;
   } else {
     signArea.innerHTML = '';
   }
@@ -1531,7 +1532,7 @@ async function workSign(preservePosition = false) {
   if (!hasAnchors) {
     _signedBlob = null;
     _signedFilename = null;
-    showPdfPreview(_workFile, _currentVisiblePage || 1, "Исходный документ");
+    showPdfPreview(_workFile, _currentVisiblePage || 1, t("work_original_doc"));
     _updateToolbarActions();
     showWorkMsg("", "");
     return;
@@ -1547,10 +1548,10 @@ async function workSign(preservePosition = false) {
 
   let res;
   try { res = await apiFetch("/v1/me/sign", { method: "POST", body: fd }); }
-  catch { return showWorkMsg("Ошибка соединения", "error"); }
+  catch { return showWorkMsg(t("sign_err_connection"), "error"); }
 
   if (res.status === 429) {
-    showWorkMsg("Лимит документов исчерпан на этот месяц", "error");
+    showWorkMsg(t("work_err_monthly_limit"), "error");
     if (window.posthog) posthog.capture("limit_reached", {step: "sign"});
     loadWorkUsage();
     return;
@@ -1562,12 +1563,12 @@ async function workSign(preservePosition = false) {
     if (res.status === 422 && (e.detail || "").includes("Нет якорей")) {
       _signedBlob = null;
       _signedFilename = null;
-      showPdfPreview(_workFile, _currentVisiblePage || 1, "Исходный документ");
+      showPdfPreview(_workFile, _currentVisiblePage || 1, t("work_original_doc"));
       _updateToolbarActions();
       showWorkMsg("", "");
       return;
     }
-    return showWorkMsg(e.detail || "Ошибка подписания", "error");
+    return showWorkMsg(e.detail || t("work_err_sign_failed"), "error");
   }
 
   const blob = await res.blob();
@@ -1648,7 +1649,7 @@ function _renderShareBlock() {
   if (!signArea || !_currentDeal) return;
   signArea.innerHTML = `
     <div class="msg info" style="display:block;margin-top:0.75rem">
-      ✓ Договор подписан вами. Нажмите ✈️ в панели инструментов сверху, чтобы передать ссылку контрагенту — он подпишет её сам, без регистрации.
+      ${t("work_signed_share_hint")}
     </div>`;
 }
 
@@ -1662,13 +1663,13 @@ function _dealInitiatorName() {
 // show it twice. WhatsApp's wa.me has no separate link param, so the link
 // has to live inside the text itself.
 function _dealShareTextTelegram() {
-  return `${_dealInitiatorName()} направил вам договор на подпись через SignFinder. `
-    + `Откройте ссылку, ознакомьтесь и подпишите:`;
+  return t("work_share_text_telegram").replace("{name}", _dealInitiatorName());
 }
 
 function _dealShareTextWhatsApp() {
-  return `${_dealInitiatorName()} направил вам договор на подпись через SignFinder. `
-    + `Откройте ссылку, ознакомьтесь и подпишите: ${_currentDeal.share_url}`;
+  return t("work_share_text_whatsapp")
+    .replace("{name}", _dealInitiatorName())
+    .replace("{link}", _currentDeal.share_url);
 }
 
 async function _markDealShared(channel) {
@@ -1691,7 +1692,7 @@ window.copyShareLink = async () => {
   const st = document.getElementById("deal-share-status");
   try {
     await navigator.clipboard.writeText(_currentDeal.share_url);
-    if (st) st.textContent = "✓ Ссылка скопирована";
+    if (st) st.textContent = t("deals_link_copied");
   } catch (e) {
     console.error("clipboard write failed:", e);
     if (st) st.textContent = _currentDeal.share_url;
@@ -2112,22 +2113,22 @@ window.toggleRememberTemplate = async function() {
       const res = await apiFetch(`/v1/me/templates/${_rememberedTemplateId}`, { method: 'DELETE' });
       if (res.ok || res.status === 404) {
         _rememberedTemplateId = null;
-        showWorkMsg('Шаблон забыт', 'success');
+        showWorkMsg(t("work_template_forgotten"), 'success');
       } else {
-        showWorkMsg('Не удалось забыть шаблон', 'error');
+        showWorkMsg(t("work_err_forget_template"), 'error');
       }
     } else {
       const res = await apiFetch('/v1/me/templates/remember', { method: 'POST', body: JSON.stringify(_buildRememberBody()) });
       if (res.ok) {
         const data = await res.json();
         _rememberedTemplateId = data.template_id;
-        showWorkMsg('Шаблон запомнен', 'success');
+        showWorkMsg(t("work_template_remembered"), 'success');
       } else {
-        showWorkMsg('Не удалось запомнить шаблон', 'error');
+        showWorkMsg(t("work_err_remember_template"), 'error');
       }
     }
   } catch {
-    showWorkMsg('Ошибка соединения', 'error');
+    showWorkMsg(t("sign_err_connection"), 'error');
   }
   if (btn) btn.disabled = false;
   _updateRememberButton();
@@ -2149,11 +2150,11 @@ async function _autoResaveRememberedTemplate() {
       _rememberedTemplateId = data.template_id;
     } else {
       _rememberedTemplateId = null;
-      showWorkMsg('Не удалось обновить сохранённый шаблон — запомните заново', 'error');
+      showWorkMsg(t("work_err_update_template"), 'error');
     }
   } catch {
     _rememberedTemplateId = null;
-    showWorkMsg('Не удалось обновить сохранённый шаблон — запомните заново', 'error');
+    showWorkMsg(t("work_err_update_template"), 'error');
   }
   _updateRememberButton();
 }
@@ -2181,19 +2182,19 @@ async function _getSignatureImgUrl() {
 
 window.toggleManualPlaceMode = async function() {
   if (!_workFile) return;
-  if (!_workSigReady) { showWorkMsg('Сначала загрузите подпись в разделе «Подпись»', 'error'); return; }
+  if (!_workSigReady) { showWorkMsg(t("work_upload_sig_first"), 'error'); return; }
   _manualPlaceMode = !_manualPlaceMode;
   const btn = document.getElementById('btn-manual-place');
   if (btn) btn.classList.toggle('active', _manualPlaceMode);
   if (_manualPlaceMode) {
     const url = await _getSignatureImgUrl();
     if (!url) {
-      showWorkMsg('Не удалось загрузить подпись', 'error');
+      showWorkMsg(t("work_err_load_sig"), 'error');
       _manualPlaceMode = false;
       if (btn) btn.classList.remove('active');
       return;
     }
-    showWorkMsg('Нажмите на документ там, где нужно поставить подпись', 'info');
+    showWorkMsg(t("work_click_to_place"), 'info');
     _attachPlacementClickHandlers();
   } else {
     _detachPlacementClickHandlers();
@@ -2240,8 +2241,8 @@ async function _onPagePlaceClick(e) {
     <img src="${imgUrl || ''}" draggable="false">
     <div class="sig-placer-handle"></div>
     <div class="sig-placer-controls">
-      <button class="sig-placer-confirm" type="button" title="Подтвердить">✓</button>
-      <button class="sig-placer-cancel" type="button" title="Отменить">×</button>
+      <button class="sig-placer-confirm" type="button" title="${t('work_confirm_title')}">✓</button>
+      <button class="sig-placer-cancel" type="button" title="${t('work_cancel_title')}">×</button>
     </div>`;
   wrap.appendChild(placer);
   _activePlacer = { el: placer, wrap, canvas };
@@ -2341,7 +2342,7 @@ async function _confirmPlacer() {
   if (btn) btn.classList.remove('active');
   _detachPlacementClickHandlers();
 
-  showWorkSpinner('Подписываем...');
+  showWorkSpinner(t("work_signing"));
   await workSign(true);
   await _autoResaveRememberedTemplate();
   hideWorkSpinner();
@@ -2382,11 +2383,11 @@ window.eraseCurrentPageSignature = async function() {
   _manualAnchors = _manualAnchors.filter(a => a.page !== page);
   if (_manualAnchors.length === before) {
     if (_excludePages.includes(page)) {
-      return showWorkMsg('На этой странице уже нет подписи', 'info');
+      return showWorkMsg(t("work_no_sig_this_page"), 'info');
     }
     _excludePages.push(page);
   }
-  showWorkSpinner('Обновляем...');
+  showWorkSpinner(t("work_updating"));
   await workSign(true);
   await _autoResaveRememberedTemplate();
   hideWorkSpinner();
