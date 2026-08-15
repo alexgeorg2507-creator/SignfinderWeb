@@ -804,34 +804,34 @@ const TABS = {
     <div id="deals-list"></div>`,
 
   feedback: `
-    <div class="section-title">Что улучшить?</div>
-    <div class="section-sub">Пара вопросов — читаю каждый ответ лично</div>
+    <div class="section-title" data-i18n="nav_feedback">Что улучшить?</div>
+    <div class="section-sub" data-i18n="feedback_sub">Пара вопросов — читаю каждый ответ лично</div>
     <div class="card" id="feedback-card">
       <div id="feedback-msg" class="msg"></div>
       <div id="feedback-form-body">
-        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem">Как вы используете SignFinder?</div>
+        <div style="font-size:14px;font-weight:500;margin-bottom:0.4rem" data-i18n="fb_usage_q">Как вы используете SignFinder?</div>
         <div class="fb-toggle-group fb-toggle-group-chips" id="fb-usage-type-group">
-          <button type="button" class="btn fb-toggle-btn" data-value="freelancer" onclick="setFeedbackUsageType('freelancer')">Фрилансер / ИП</button>
-          <button type="button" class="btn fb-toggle-btn" data-value="small_business" onclick="setFeedbackUsageType('small_business')">Малый бизнес</button>
-          <button type="button" class="btn fb-toggle-btn" data-value="legal_dept" onclick="setFeedbackUsageType('legal_dept')">Юридический отдел / агентство</button>
-          <button type="button" class="btn fb-toggle-btn" data-value="other" onclick="setFeedbackUsageType('other')">Другое</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="freelancer" onclick="setFeedbackUsageType('freelancer')" data-i18n="fb_usage_freelancer">Фрилансер / ИП</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="small_business" onclick="setFeedbackUsageType('small_business')" data-i18n="fb_usage_small_business">Малый бизнес</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="legal_dept" onclick="setFeedbackUsageType('legal_dept')" data-i18n="fb_usage_legal_dept">Юридический отдел / агентство</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="other" onclick="setFeedbackUsageType('other')" data-i18n="fb_usage_other">Другое</button>
         </div>
 
-        <div style="font-size:14px;font-weight:500;margin:1rem 0 0.4rem">За какую из этих фич вы готовы платить?</div>
+        <div style="font-size:14px;font-weight:500;margin:1rem 0 0.4rem" data-i18n="fb_premium_q">За какую из этих фич вы готовы платить?</div>
         <div class="fb-toggle-group" id="fb-premium-features-group">
-          <button type="button" class="btn fb-toggle-btn" data-value="local_deployment" onclick="toggleFeedbackPremiumFeature('local_deployment')">Локальная установка — документы не покидают вашу инфраструктуру</button>
-          <button type="button" class="btn fb-toggle-btn" data-value="higher_limits" onclick="toggleFeedbackPremiumFeature('higher_limits')">Расширенные лимиты объёма документов</button>
-          <button type="button" class="btn fb-toggle-btn" data-value="api_integrations" onclick="toggleFeedbackPremiumFeature('api_integrations')">API/интеграции (Cursor, Claude Desktop и т.п.)</button>
-          <button type="button" class="btn fb-toggle-btn" data-value="mailbox_integration" onclick="toggleFeedbackPremiumFeature('mailbox_integration')">Интеграция с почтовым ящиком и обработка в фоновом режиме</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="local_deployment" onclick="toggleFeedbackPremiumFeature('local_deployment')" data-i18n="fb_premium_local">Локальная установка — документы не покидают вашу инфраструктуру</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="higher_limits" onclick="toggleFeedbackPremiumFeature('higher_limits')" data-i18n="fb_premium_limits">Расширенные лимиты объёма документов</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="api_integrations" onclick="toggleFeedbackPremiumFeature('api_integrations')" data-i18n="fb_premium_api">API/интеграции (Cursor, Claude Desktop и т.п.)</button>
+          <button type="button" class="btn fb-toggle-btn" data-value="mailbox_integration" onclick="toggleFeedbackPremiumFeature('mailbox_integration')" data-i18n="fb_premium_mailbox">Интеграция с почтовым ящиком и обработка в фоновом режиме</button>
         </div>
-        <input class="input" id="fb-premium-other" placeholder="Другое (необязательно)" oninput="_updateFeedbackSubmitState()" style="margin-top:0.5rem">
+        <input class="input" id="fb-premium-other" data-i18n-placeholder="fb_premium_other_placeholder" placeholder="Другое (необязательно)" oninput="_updateFeedbackSubmitState()" style="margin-top:0.5rem">
 
-        <div style="font-size:14px;font-weight:500;margin:1rem 0 0.4rem">Вы уже порекомендовали коллеге?</div>
+        <div style="font-size:14px;font-weight:500;margin:1rem 0 0.4rem" data-i18n="fb_referred_q">Вы уже порекомендовали коллеге?</div>
         <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
-          <button type="button" class="btn" id="fb-refer-yes" onclick="setFeedbackRefer(true)" style="width:auto;flex:1">Да</button>
-          <button type="button" class="btn" id="fb-refer-no" onclick="setFeedbackRefer(false)" style="width:auto;flex:1">Нет</button>
+          <button type="button" class="btn" id="fb-refer-yes" onclick="setFeedbackRefer(true)" style="width:auto;flex:1" data-i18n="fb_referred_yes">Да</button>
+          <button type="button" class="btn" id="fb-refer-no" onclick="setFeedbackRefer(false)" style="width:auto;flex:1" data-i18n="fb_referred_no">Нет</button>
         </div>
-        <button class="btn btn-primary" id="feedback-submit-btn" onclick="submitFeedback()" style="margin-top:0.25rem" disabled>Отправить</button>
+        <button class="btn btn-primary" id="feedback-submit-btn" onclick="submitFeedback()" style="margin-top:0.25rem" disabled data-i18n="fb_submit">Отправить</button>
       </div>
     </div>`,
 };
@@ -2016,18 +2016,18 @@ window.submitFeedback = async () => {
     res = await apiFetch("/v1/feedback", { method: "POST", body: JSON.stringify(payload) });
   } catch (e) {
     console.error("submitFeedback failed:", e);
-    showFeedbackMsg("Не получилось отправить, попробуйте позже", "error");
+    showFeedbackMsg(t("fb_err_submit_failed"), "error");
     return;
   }
   if (!res.ok) {
     console.error("submitFeedback failed:", res.status);
-    showFeedbackMsg("Не получилось отправить, попробуйте позже", "error");
+    showFeedbackMsg(t("fb_err_submit_failed"), "error");
     return;
   }
 
   const body = document.getElementById("feedback-form-body");
   if (body) body.style.display = "none";
-  showFeedbackMsg("Спасибо, передано разработчику", "success");
+  showFeedbackMsg(t("fb_submit_success"), "success");
 };
 
 // ── Fix-7: remember/forget templates, manual placement, page erase ─────────
@@ -2037,7 +2037,7 @@ function _updateRememberButton() {
   if (!btn) return;
   const active = !!_rememberedTemplateId;
   btn.classList.toggle('active', active);
-  btn.title = active ? 'Забыть шаблон' : 'Запомнить шаблон';
+  btn.title = active ? t("work_forget_template_title") : t("work_remember_template_title");
 }
 
 // Fix-20: инструменты видны всегда (Req 9) — неприменимые сейчас тускнеют
