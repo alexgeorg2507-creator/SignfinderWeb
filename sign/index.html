@@ -85,6 +85,11 @@
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
   window._pdfjsLib = pdfjsLib;
 </script>
+<!-- TASK_i18n_en.md §4: classic script, shares global scope with the
+     classic <script> below (currentLang/t() are used directly in the
+     render functions, not via data-i18n — this page is fully rendered
+     from template strings, there's no static markup to decorate). -->
+<script src="/i18n.js"></script>
 </head>
 <body>
 
@@ -114,61 +119,66 @@ function showError(text) {
 }
 
 async function init() {
+  // TASK_i18n_en.md §4: the deal itself carries the language (set once by
+  // the initiator at creation time, see deals.language) - nothing to read
+  // it from until the fetch below succeeds, so error screens before that
+  // point necessarily fall back to i18n.js's 'ru' default.
   if (!SHARE_TOKEN) {
-    showError('Неверная ссылка.');
+    showError(t('sign_invalid_link'));
     return;
   }
   let res;
   try {
     res = await apiFetch(`/v1/public/deals/${SHARE_TOKEN}`);
   } catch {
-    showError('Нет связи с сервером. Обновите страницу.');
+    showError(t('sign_no_connection'));
     return;
   }
   if (res.status === 404) {
-    showError('Ссылка недействительна или сделка удалена.');
+    showError(t('sign_link_invalid_404'));
     return;
   }
   if (res.status === 429) {
-    showError('Слишком много попыток. Попробуйте через минуту.');
+    showError(t('sign_rate_limited'));
     return;
   }
   if (!res.ok) {
-    showError('Не удалось загрузить сделку.');
+    showError(t('sign_load_failed'));
     return;
   }
   _deal = await res.json();
+  currentLang = _deal.language || 'ru';
   renderScreen();
   loadPdf();
 }
 
 function renderScreen() {
   const expires = new Date(_deal.expires_at);
-  const expiresStr = expires.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  const expiresStr = expires.toLocaleDateString(currentLang === 'en' ? 'en-US' : 'ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const signedBadge = _deal.status === 'signed'
-    ? `<div class="badge-signed">✓ Договор подписан</div>`
+    ? `<div class="badge-signed">${t('sign_signed_badge')}</div>`
     : '';
 
   const downloadBtn = _deal.has_final_pdf
-    ? `<button class="btn btn-primary" onclick="downloadFinal()">Скачать финальный PDF</button>`
+    ? `<button class="btn btn-primary" onclick="downloadFinal()">${t('sign_download_final')}</button>`
     : '';
 
   const signingForm = (_deal.status === 'signed') ? '' : renderSigningForm();
 
   el('app').innerHTML = `
     <div class="card">
-      <div class="deal-from">Договор от <b>${escapeHtml(_deal.initiator_email)}</b> на подпись</div>
+      <div class="deal-from">${t('sign_deal_from')} <b>${escapeHtml(_deal.initiator_email)}</b> ${t('sign_for_signature')}</div>
       ${signedBadge}
       <div class="pdf-panel">
-        <div class="pdf-scroll" id="pdf-scroll"><div class="pdf-empty">Загрузка документа…</div></div>
+        <div class="pdf-scroll" id="pdf-scroll"><div class="pdf-empty">${t('sign_pdf_loading')}</div></div>
       </div>
       ${downloadBtn}
     </div>
     ${signingForm}
     <div class="footer-note">
-      powered by SignFinder · Ссылка действует до ${expiresStr}<br>
-      <a href="/pep-agreement" target="_blank">Соглашение об ПЭП</a>
+      ${t('sign_footer_powered')} ${expiresStr}<br>
+      <a href="/pep-agreement" target="_blank">${t('sign_pep_agreement_link')}</a>
     </div>
   `;
 
@@ -182,67 +192,61 @@ function renderSigningForm() {
     <div class="card" id="sign-card">
       <div id="sign-msg" class="msg"></div>
 
-      <div class="disclaimer">
-        ⓘ Подписывая ниже, вы ставите простую электронную подпись (ПЭП) — она
-        юридически равнозначна собственноручной подписи на бумаге при
-        согласии обеих сторон.
-      </div>
+      <div class="disclaimer">${t('sign_disclaimer')}</div>
       <label class="consent-row">
         <input type="checkbox" id="consent-pep">
-        Я согласен, что моя подпись, поставленная в этом документе, является
-        простой электронной подписью в понимании ст. 5 ФЗ-63, и признаю её
-        равнозначной собственноручной подписи на бумажном документе.
+        ${t('sign_consent_pep')}
       </label>
 
-      <div style="font-size:14px;font-weight:600;margin:1rem 0 0.5rem">Ваша подпись</div>
+      <div style="font-size:14px;font-weight:600;margin:1rem 0 0.5rem">${t('sign_your_signature')}</div>
       <div class="tabs">
-        <button class="tab-btn active" id="tab-btn-camera" onclick="switchTab('camera')">📷 Фото</button>
-        <button class="tab-btn" id="tab-btn-file" onclick="switchTab('file')">📁 Файл</button>
-        <button class="tab-btn" id="tab-btn-canvas" onclick="switchTab('canvas')">✏️ Нарисовать</button>
+        <button class="tab-btn active" id="tab-btn-camera" onclick="switchTab('camera')">${t('sign_tab_camera')}</button>
+        <button class="tab-btn" id="tab-btn-file" onclick="switchTab('file')">${t('sign_tab_file')}</button>
+        <button class="tab-btn" id="tab-btn-canvas" onclick="switchTab('canvas')">${t('sign_tab_canvas')}</button>
       </div>
 
       <div class="tab-panel active" id="tab-camera">
         <label class="upload-label">
-          📷 Сделать фото подписи
+          ${t('sign_take_photo')}
           <input type="file" id="inp-camera" accept="image/*" capture="environment" style="display:none">
         </label>
-        <div class="hint">Подпись на белом листе, хорошее освещение.</div>
+        <div class="hint">${t('sign_camera_hint')}</div>
       </div>
 
       <div class="tab-panel" id="tab-file">
         <label class="upload-label">
-          📁 Выбрать файл
+          ${t('sign_choose_file')}
           <input type="file" id="inp-file" accept="image/*" style="display:none">
         </label>
-        <div class="hint">PNG или JPG с уже отсканированной подписью.</div>
+        <div class="hint">${t('sign_file_hint')}</div>
       </div>
 
       <div class="tab-panel" id="tab-canvas">
         <canvas id="sign-canvas"></canvas>
-        <div class="hint">Нарисуйте подпись пальцем или мышью.</div>
+        <div class="hint">${t('sign_canvas_hint')}</div>
         <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
-          <button class="btn" onclick="clearCanvas()" type="button">Очистить</button>
-          <button class="btn" onclick="useCanvasSignature()" type="button">Готово</button>
+          <button class="btn" onclick="clearCanvas()" type="button">${t('sign_clear')}</button>
+          <button class="btn" onclick="useCanvasSignature()" type="button">${t('sign_done')}</button>
         </div>
       </div>
 
-      <div id="sig-processing" style="display:none;text-align:center;color:var(--c-muted);font-size:14px;padding:0.5rem 0">⏳ Обработка…</div>
+      <div id="sig-processing" style="display:none;text-align:center;color:var(--c-muted);font-size:14px;padding:0.5rem 0">${t('sign_processing')}</div>
 
       <div id="sig-preview" style="display:none">
         <div class="sig-grid">
           <div class="sig-col">
-            <div class="sig-col-label">Оригинал</div>
+            <div class="sig-col-label">${t('sign_original')}</div>
             <img id="sig-original" class="sig-img">
           </div>
           <div class="sig-col">
-            <div class="sig-col-label">После обработки</div>
+            <div class="sig-col-label">${t('sign_processed')}</div>
             <img id="sig-processed" class="sig-img sig-img-processed">
           </div>
         </div>
         <div id="sig-meta" class="sig-meta"></div>
       </div>
 
-      <button class="btn btn-primary" id="btn-sign" onclick="doSign()" disabled style="margin-top:0.5rem">Подписать</button>
+      <button class="btn btn-primary" id="btn-sign" onclick="doSign()" disabled style="margin-top:0.5rem">${t('sign_btn_sign')}</button>
     </div>
   `;
 }
@@ -336,13 +340,13 @@ async function onSignatureFile(file) {
     res = await apiFetch(`/v1/public/deals/${SHARE_TOKEN}/signature/preview`, { method: 'POST', body: fd });
   } catch {
     el('sig-processing').style.display = 'none';
-    showSignMsg('Ошибка соединения', 'error');
+    showSignMsg(t('sign_err_connection'), 'error');
     return;
   }
   el('sig-processing').style.display = 'none';
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    showSignMsg(err.detail || 'Не удалось обработать подпись', 'error');
+    showSignMsg(err.detail || t('sign_err_process_failed'), 'error');
     return;
   }
   const data = await res.json();
@@ -354,8 +358,8 @@ function applyProcessedSignature(data) {
   el('sig-processed').src = 'data:image/png;base64,' + data.processed_png_b64;
   el('sig-preview').style.display = 'block';
   const pct = Math.round((data.confidence || 0) * 100);
-  const warns = (data.warnings || []).length ? ('⚠️ ' + data.warnings.join('; ')) : '✓ Обработка успешна';
-  el('sig-meta').textContent = `Качество: ${pct}% · ${warns}`;
+  const warns = (data.warnings || []).length ? ('⚠️ ' + data.warnings.join('; ')) : t('sign_processing_success');
+  el('sig-meta').textContent = `${t('sign_quality')}: ${pct}% · ${warns}`;
   updateSignButtonState();
 }
 
@@ -425,7 +429,7 @@ window.clearCanvas = () => {
 
 window.useCanvasSignature = async () => {
   if (!_canvasHasInk) {
-    showSignMsg('Сначала нарисуйте подпись', 'error');
+    showSignMsg(t('sign_err_draw_first'), 'error');
     return;
   }
   const canvas = el('sign-canvas');
@@ -443,13 +447,13 @@ window.useCanvasSignature = async () => {
     res = await apiFetch(`/v1/public/deals/${SHARE_TOKEN}/signature/preview`, { method: 'POST', body: fd });
   } catch {
     el('sig-processing').style.display = 'none';
-    showSignMsg('Ошибка соединения', 'error');
+    showSignMsg(t('sign_err_connection'), 'error');
     return;
   }
   el('sig-processing').style.display = 'none';
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    showSignMsg(err.detail || 'Не удалось обработать подпись', 'error');
+    showSignMsg(err.detail || t('sign_err_process_failed'), 'error');
     return;
   }
   applyProcessedSignature(await res.json());
@@ -467,7 +471,7 @@ function showSignMsg(text, kind) {
 window.doSign = async () => {
   const btn = el('btn-sign');
   btn.disabled = true;
-  btn.textContent = 'Подписание…';
+  btn.textContent = t('sign_btn_signing');
 
   const sourceMap = { camera: 'camera', file: 'file', canvas: 'canvas' };
   let res;
@@ -483,21 +487,21 @@ window.doSign = async () => {
     });
   } catch {
     btn.disabled = false;
-    btn.textContent = 'Подписать';
-    showSignMsg('Ошибка соединения', 'error');
+    btn.textContent = t('sign_btn_sign');
+    showSignMsg(t('sign_err_connection'), 'error');
     return;
   }
 
   if (res.status === 409) {
-    showSignMsg('Эта сделка уже подписана. Обновите страницу.', 'error');
-    btn.textContent = 'Подписать';
+    showSignMsg(t('sign_err_already_signed'), 'error');
+    btn.textContent = t('sign_btn_sign');
     return;
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    showSignMsg(err.detail || 'Не удалось подписать', 'error');
+    showSignMsg(err.detail || t('sign_err_sign_failed'), 'error');
     btn.disabled = false;
-    btn.textContent = 'Подписать';
+    btn.textContent = t('sign_btn_sign');
     return;
   }
 
