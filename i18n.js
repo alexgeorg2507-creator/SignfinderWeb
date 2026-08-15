@@ -220,6 +220,39 @@ const STRINGS = {
     work_cancel_title: "Отменить",
     work_no_sig_this_page: "На этой странице уже нет подписи",
     work_updating: "Обновляем...",
+    // Bug fix found while working the survey task: _updateRememberButton()
+    // was setting btn.title to a hardcoded RU string directly, silently
+    // overwriting the data-i18n-title="work_remember_template_title" set in
+    // the earlier work-tab static-markup slice every time the toolbar
+    // re-renders. Needs its own key since it's a *different* string (the
+    // "forget" state), not a duplicate of work_remember_template_title.
+    work_forget_template_title: "Забыть шаблон",
+
+    // app/index.html — Что улучшить? (feedback) tab. TASK_i18n_en.md §0
+    // originally scoped this out as RU-only ("internal tool") - reversed
+    // per TASK_i18n_en_survey.md after the owner saw the live EN cabinet.
+    // Backend (app/routers/feedback.py) is untouched: UsageType/
+    // PremiumFeature enum values sent to POST /v1/feedback don't change
+    // with the UI language, and the Telegram message to the owner stays
+    // RU always - only what the user sees here gets translated.
+    feedback_sub: "Пара вопросов — читаю каждый ответ лично",
+    fb_usage_q: "Как вы используете SignFinder?",
+    fb_usage_freelancer: "Фрилансер / ИП",
+    fb_usage_small_business: "Малый бизнес",
+    fb_usage_legal_dept: "Юридический отдел / агентство",
+    fb_usage_other: "Другое",
+    fb_premium_q: "За какую из этих фич вы готовы платить?",
+    fb_premium_local: "Локальная установка — документы не покидают вашу инфраструктуру",
+    fb_premium_limits: "Расширенные лимиты объёма документов",
+    fb_premium_api: "API/интеграции (Cursor, Claude Desktop и т.п.)",
+    fb_premium_mailbox: "Интеграция с почтовым ящиком и обработка в фоновом режиме",
+    fb_premium_other_placeholder: "Другое (необязательно)",
+    fb_referred_q: "Вы уже порекомендовали коллеге?",
+    fb_referred_yes: "Да",
+    fb_referred_no: "Нет",
+    fb_submit: "Отправить",
+    fb_err_submit_failed: "Не получилось отправить, попробуйте позже",
+    fb_submit_success: "Спасибо, передано разработчику",
   },
   en: {
     auth_sub: "Sign contracts in a minute",
@@ -406,6 +439,26 @@ const STRINGS = {
     work_cancel_title: "Cancel",
     work_no_sig_this_page: "No signature on this page anymore",
     work_updating: "Updating...",
+    work_forget_template_title: "Forget template",
+
+    feedback_sub: "A couple of questions — I read every answer personally",
+    fb_usage_q: "How do you use SignFinder?",
+    fb_usage_freelancer: "Freelancer / Sole proprietor",
+    fb_usage_small_business: "Small business",
+    fb_usage_legal_dept: "Legal department / agency",
+    fb_usage_other: "Other",
+    fb_premium_q: "Which of these would increase the likelihood you'd become a paying user?",
+    fb_premium_local: "Local / on-premise installation — documents never leave your infrastructure",
+    fb_premium_limits: "Higher document volume limits",
+    fb_premium_api: "API / integrations (Cursor, Claude Desktop, etc.)",
+    fb_premium_mailbox: "Mailbox integration with background processing",
+    fb_premium_other_placeholder: "Other (optional)",
+    fb_referred_q: "Have you already recommended it to a colleague?",
+    fb_referred_yes: "Yes",
+    fb_referred_no: "No",
+    fb_submit: "Send",
+    fb_err_submit_failed: "Couldn't send it, try again later",
+    fb_submit_success: "Thanks, passed along to the developer",
   },
 };
 
