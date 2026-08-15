@@ -475,24 +475,15 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  // fix21: terms-acceptance gate. Unlike emailVerified (a property already
-  // on the Firebase user object, no network call needed), there's no
-  // client-side signal for this — GET /v1/me is the only way to know.
-  // On a network failure here we fail OPEN (proceed to cabinet) rather than
-  // lock the user out on a transient hiccup; POST /me/accept-terms is the
-  // one that actually has to succeed to skip the gate on the next login.
-  try {
-    const meRes = await apiFetch("/v1/me");
-    if (meRes.ok) {
-      const me = await meRes.json();
-      if (!me.terms_accepted) {
-        showScreen("terms");
-        return;
-      }
-    }
-  } catch (e) {
-    console.error("GET /v1/me failed:", e);
-  }
+  // fix22 §1: fix21's terms-acceptance gate parked — the legal documents it
+  // gates on are themselves parked (fix22 §2) until a real Georgia legal
+  // entity is registered and [ИМЯ/РЕГИСТРАЦИЯ ВЛАДЕЛЬЦА] is filled in.
+  // Cut the GET /v1/me call itself, not just its result — simpler to
+  // reason about than a dead branch that always evaluates false. The
+  // #screen-terms markup and updateTermsButtonState()/acceptTerms() below
+  // are kept as unreachable dead code on purpose (fix22 §3: ~20 minutes of
+  // work to un-park, not a rewrite) — the backend endpoints are untouched
+  // either way. Revert = restore this block, see git history pre-fix22.
 
   idToken = await user.getIdToken();
   document.getElementById("topbar-email").textContent = user.email;
@@ -577,10 +568,7 @@ const TABS = {
     </div>
     <div id="profile-version-footer" style="margin-top:2rem;text-align:center;font-size:11px;color:var(--c-muted)"></div>
     <div style="text-align:center;font-size:11px;margin-top:0.4rem">
-      <a href="/pep-agreement" target="_blank" style="color:var(--c-muted)">Соглашение об ПЭП</a> ·
-      <a href="/terms" target="_blank" style="color:var(--c-muted)">Оферта</a> ·
-      <a href="/privacy" target="_blank" style="color:var(--c-muted)">Конфиденциальность</a> ·
-      <a href="/cookies" target="_blank" style="color:var(--c-muted)">Cookies</a>
+      <a href="/pep-agreement" target="_blank" style="color:var(--c-muted)">Соглашение об ПЭП</a>
     </div>`,
 
   signature: `
