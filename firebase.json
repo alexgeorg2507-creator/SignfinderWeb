@@ -22,6 +22,7 @@
       { "source": "/en/app/**", "destination": "/app/index.html" },
       { "source": "/sign/**", "destination": "/sign/index.html" },
       { "source": "/pep-agreement", "destination": "/pep-agreement.html" },
+      { "source": "/en/pep-agreement", "destination": "/pep-agreement-en.html" },
       { "source": "/en/enterprise", "destination": "/index-enterprise.html" },
       { "source": "/ru/enterprise", "destination": "/index-enterprise.html" },
       { "source": "/enterprise",    "destination": "/index-enterprise.html" },
