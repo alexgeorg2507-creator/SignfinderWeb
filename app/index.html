@@ -65,6 +65,8 @@
   .topbar-user { display: flex; align-items: center; gap: 0.75rem; font-size: 14px; color: var(--c-muted); }
   .btn-logout { font-size: 13px; color: var(--c-muted); background: none; border: 1px solid var(--c-border); border-radius: 8px; padding: 0.35rem 0.75rem; cursor: pointer; font-family: inherit; }
   .btn-logout:hover { background: var(--c-bg); }
+  .lang-toggle-btn { font-size: 13px; font-weight: 600; color: var(--c-muted); background: none; border: 1px solid var(--c-border); border-radius: 8px; padding: 0.35rem 0.6rem; cursor: pointer; font-family: inherit; min-width: 34px; }
+  .lang-toggle-btn:hover { background: var(--c-bg); color: var(--c-text); }
   /* Fix-21: гамбургер + выпадающее меню вместо нижнего sticky-меню — тот же
      класс бага (базовое правило после media-запроса) уже один раз тихо
      сломал нижнее меню незаметно для глаза; топбар всегда виден и не
@@ -283,6 +285,10 @@
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
   window._pdfjsLib = pdfjsLib;
 </script>
+<!-- TASK_i18n_en.md §0: classic script (not module) so its top-level
+     declarations (STRINGS/currentLang/t/applyI18n) share the page's global
+     scope with the inline scripts below that call them. -->
+<script src="/i18n.js"></script>
 </head>
 <body>
 
@@ -290,29 +296,29 @@
 <div id="screen-auth" class="screen active">
   <div class="auth-card">
     <div class="auth-logo">SignFinder</div>
-    <div class="auth-sub">Подпись договоров за минуту</div>
+    <div class="auth-sub" data-i18n="auth_sub">Подпись договоров за минуту</div>
 
     <div id="auth-msg" class="msg"></div>
 
     <button class="btn" id="btn-google" onclick="signInGoogle()">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.638-.057-1.252-.164-1.84H9v3.48h4.844a4.14 4.14 0 0 1-1.796 2.717v2.258h2.908C16.657 14.108 17.64 11.863 17.64 9.2z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.185l-2.908-2.258c-.806.54-1.837.859-3.048.859-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.705A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.705V4.963H.957A9 9 0 0 0 0 9c0 1.452.348 2.827.957 4.037l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.963L3.964 7.295C4.672 5.168 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
-      Войти через Google
+      <span data-i18n="btn_google">Войти через Google</span>
     </button>
 
-    <div class="divider">или через email</div>
+    <div class="divider" data-i18n="divider_or_email">или через email</div>
 
     <div id="form-signin">
       <input class="input" type="email" id="inp-email" placeholder="email@example.com">
-      <input class="input" type="password" id="inp-pass" placeholder="Пароль">
-      <button class="btn btn-primary" onclick="signInEmail()">Войти</button>
-      <button class="form-link" onclick="showRegister()">Нет аккаунта? Зарегистрироваться</button>
+      <input class="input" type="password" id="inp-pass" placeholder="Пароль" data-i18n-placeholder="inp_pass_placeholder">
+      <button class="btn btn-primary" onclick="signInEmail()" data-i18n="btn_signin">Войти</button>
+      <button class="form-link" onclick="showRegister()" data-i18n="link_no_account">Нет аккаунта? Зарегистрироваться</button>
     </div>
 
     <div id="form-register" style="display:none">
       <input class="input" type="email" id="inp-reg-email" placeholder="email@example.com">
-      <input class="input" type="password" id="inp-reg-pass" placeholder="Пароль (минимум 8 символов)">
-      <button class="btn btn-primary" onclick="registerEmail()">Создать аккаунт</button>
-      <button class="form-link" onclick="showSignin()">Уже есть аккаунт? Войти</button>
+      <input class="input" type="password" id="inp-reg-pass" placeholder="Пароль (минимум 8 символов)" data-i18n-placeholder="inp_reg_pass_placeholder">
+      <button class="btn btn-primary" onclick="registerEmail()" data-i18n="btn_register">Создать аккаунт</button>
+      <button class="form-link" onclick="showSignin()" data-i18n="link_have_account">Уже есть аккаунт? Войти</button>
     </div>
   </div>
 </div>
@@ -321,11 +327,11 @@
 <div id="screen-verify" class="screen">
   <div class="verify-card">
     <div style="font-size:48px; margin-bottom:1rem">📧</div>
-    <h2>Подтвердите email</h2>
-    <p>Мы отправили письмо на <strong id="verify-email"></strong>.<br>Перейдите по ссылке в письме, затем вернитесь сюда.</p>
-    <button class="btn btn-primary" onclick="checkVerified()" style="margin-bottom:0.75rem">Я подтвердил</button>
-    <button class="btn" onclick="resendVerification()">Отправить письмо повторно</button>
-    <button class="form-link" onclick="signOut()">Выйти</button>
+    <h2 data-i18n="verify_title">Подтвердите email</h2>
+    <p><span data-i18n="verify_text_1">Мы отправили письмо на </span><strong id="verify-email"></strong><span data-i18n="verify_text_2">.</span><br><span data-i18n="verify_text_3">Перейдите по ссылке в письме, затем вернитесь сюда.</span></p>
+    <button class="btn btn-primary" onclick="checkVerified()" style="margin-bottom:0.75rem" data-i18n="verify_btn_confirmed">Я подтвердил</button>
+    <button class="btn" onclick="resendVerification()" data-i18n="verify_btn_resend">Отправить письмо повторно</button>
+    <button class="form-link" onclick="signOut()" data-i18n="signout">Выйти</button>
   </div>
 </div>
 
@@ -354,8 +360,9 @@
     </div>
     <div class="topbar-user">
       <span id="topbar-email"></span>
-      <button class="btn-logout" onclick="signOut()">Выйти</button>
-      <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileMenu(event)" aria-label="Меню" title="Меню">
+      <button class="lang-toggle-btn" id="lang-toggle-btn" onclick="toggleLang()"></button>
+      <button class="btn-logout" onclick="signOut()"><span data-i18n="signout">Выйти</span></button>
+      <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileMenu(event)" data-i18n-aria-label="menu" data-i18n-title="menu" aria-label="Меню" title="Меню">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
       </button>
     </div>
@@ -366,32 +373,32 @@
        безопасной зоны снизу экрана на iOS) -->
   <div class="mobile-dropdown" id="mobile-dropdown">
     <div class="mobile-dropdown-item active" onclick="showTab('profile')" id="mdrop-profile">
-      <span>👤</span> Профиль
+      <span>👤</span> <span data-i18n="nav_profile">Профиль</span>
     </div>
     <div class="mobile-dropdown-item" onclick="showTab('work')" id="mdrop-work">
-      <span>📄</span> Подписать договор
+      <span>📄</span> <span data-i18n="nav_work">Подписать договор</span>
     </div>
     <div class="mobile-dropdown-item" onclick="showTab('deals')" id="mdrop-deals">
-      <span>📋</span> Мои сделки
+      <span>📋</span> <span data-i18n="nav_deals">Мои сделки</span>
     </div>
     <div class="mobile-dropdown-item" onclick="showTab('feedback')" id="mdrop-feedback">
-      <span>💬</span> Что улучшить?
+      <span>💬</span> <span data-i18n="nav_feedback">Что улучшить?</span>
     </div>
   </div>
 
   <div class="cabinet-layout">
     <nav class="sidebar">
       <div class="nav-item active" onclick="showTab('profile')" id="nav-profile">
-        <span class="nav-icon">👤</span> Профиль
+        <span class="nav-icon">👤</span> <span data-i18n="nav_profile">Профиль</span>
       </div>
       <div class="nav-item" onclick="showTab('work')" id="nav-work">
-        <span class="nav-icon">📄</span> Подписать договор
+        <span class="nav-icon">📄</span> <span data-i18n="nav_work">Подписать договор</span>
       </div>
       <div class="nav-item" onclick="showTab('deals')" id="nav-deals">
-        <span class="nav-icon">📋</span> Мои сделки
+        <span class="nav-icon">📋</span> <span data-i18n="nav_deals">Мои сделки</span>
       </div>
       <div class="nav-item" onclick="showTab('feedback')" id="nav-feedback">
-        <span class="nav-icon">💬</span> Что улучшить?
+        <span class="nav-icon">💬</span> <span data-i18n="nav_feedback">Что улучшить?</span>
       </div>
     </nav>
 
@@ -427,6 +434,32 @@ const FIREBASE_CONFIG = isTest ? {
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
+
+// TASK_i18n_en.md §3: URL prefix decides the language shown before login
+// (and a brand-new account's stored language, see apiFetch's X-UI-Language
+// header); a returning user's own saved preference then overrides it once
+// onAuthStateChanged reads GET /v1/me below.
+currentLang = detectLangFromPath();
+function updateLangToggleLabel() {
+  const btn = document.getElementById("lang-toggle-btn");
+  if (btn) btn.textContent = currentLang === "ru" ? "EN" : "RU";
+}
+updateLangToggleLabel();
+applyI18n();
+
+window.toggleLang = async () => {
+  currentLang = currentLang === "ru" ? "en" : "ru";
+  updateLangToggleLabel();
+  applyI18n();
+  try {
+    await apiFetch("/v1/me/language", {
+      method: "PUT",
+      body: JSON.stringify({ language: currentLang }),
+    });
+  } catch (e) {
+    console.error("PUT /v1/me/language failed:", e);
+  }
+};
 
 // Version — injected by CI, fallback to 'dev'. Shown only in profile footer.
 const _sfVersion = (typeof window.__SF_VERSION__ !== 'undefined') ? window.__SF_VERSION__ : 'dev';
@@ -487,6 +520,24 @@ onAuthStateChanged(auth, async (user) => {
 
   idToken = await user.getIdToken();
   document.getElementById("topbar-email").textContent = user.email;
+
+  // TASK_i18n_en.md §3: sync the stored language preference on login — a
+  // returning 'en' user visiting plain /app must stay in English, not
+  // revert to the URL-guessed default set above. Reads GET /v1/me only for
+  // its `language` field; `terms_accepted` is deliberately ignored, the
+  // fix22 gate stays parked.
+  try {
+    const meRes = await apiFetch("/v1/me");
+    if (meRes.ok) {
+      const me = await meRes.json();
+      if (me.language) currentLang = me.language;
+    }
+  } catch (e) {
+    console.error("GET /v1/me language sync failed:", e);
+  }
+  updateLangToggleLabel();
+  applyI18n();
+
   showScreen("cabinet");
   showTab("profile");
   if (!_signupCompletedFired) {
@@ -846,7 +897,10 @@ document.addEventListener('click', (ev) => {
 // ── API helper ─────────────────────────────────────────────────────────────
 async function apiFetch(path, opts = {}) {
   const token = await refreshToken();
-  const headers = { Authorization: "Bearer " + token };
+  // TASK_i18n_en.md §1: read only on a brand-new user's INSERT (see
+  // app/routers/me.py::_get_or_create_user) — harmless to send on every
+  // request since later visits ignore it.
+  const headers = { Authorization: "Bearer " + token, "X-UI-Language": currentLang };
   if (!(opts.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
