@@ -59,6 +59,11 @@ const STRINGS = {
     sign_pdf_loading: "Загрузка документа…",
     sign_footer_powered: "powered by SignFinder · Ссылка действует до",
     sign_pep_agreement_link: "Соглашение об ПЭП",
+    // TASK_i18n_en_pep_agreement.md: pep-agreement-en.html is real,
+    // routed content (unlike terms-en/privacy-en/cookies-en, which stay
+    // unrouted placeholders) - every link to it must follow the
+    // viewer's language, not hardcode the RU path.
+    pep_agreement_href: "/pep-agreement",
     sign_disclaimer: "ⓘ Подписывая ниже, вы ставите простую электронную подпись (ПЭП) — она юридически равнозначна собственноручной подписи на бумаге при согласии обеих сторон.",
     sign_consent_pep: "Я согласен, что моя подпись, поставленная в этом документе, является простой электронной подписью в понимании ст. 5 ФЗ-63, и признаю её равнозначной собственноручной подписи на бумажном документе.",
     sign_your_signature: "Ваша подпись",
@@ -293,6 +298,7 @@ const STRINGS = {
     sign_pdf_loading: "Loading document…",
     sign_footer_powered: "powered by SignFinder · Link valid until",
     sign_pep_agreement_link: "PEP Agreement",
+    pep_agreement_href: "/en/pep-agreement",
     sign_disclaimer: "ⓘ By signing below, you are applying a simple electronic signature (PEP) — under Russian law (63-FZ), it is legally equivalent to a handwritten signature on paper when both parties agree.",
     sign_consent_pep: "I agree that the signature I place on this document is a simple electronic signature under Article 5 of Russian Federal Law 63-FZ, and I recognize it as equivalent to a handwritten signature on paper.",
     sign_your_signature: "Your signature",
@@ -474,6 +480,7 @@ function applyI18n(root) {
   root.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
   root.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
   root.querySelectorAll('[data-i18n-aria-label]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel)); });
+  root.querySelectorAll('[data-i18n-href]').forEach(el => { el.href = t(el.dataset.i18nHref); });
 }
 
 // TASK_i18n_en.md §1: which language a brand-new user's account gets is
