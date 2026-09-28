@@ -175,8 +175,53 @@ GCP Secret Manager, если бот тот же).
 
 ---
 
+## §7. Новый Firebase-проект — Hosting site создаётся явно
+
+Источник: уведомление Firebase (получено 2026-09-28). С **2026-10-15**
+новые Firebase-проекты больше не получают default Hosting site при
+создании — он появляется по требованию (первый деплой, создание Web App,
+Google Sign-In redirect). Скриптованный деплой в свежий проект падает с
+`404 Site Not Found`. Консольное ручное создание сайта — не затронуто.
+
+**Что затронуто у нас сейчас: ничего.** `signfinder-cab-test` и
+`signfinder-prod` созданы раньше этой даты, default site у обоих уже есть
+(`signfinder-cab-test.web.app`; `signfinder-prod.web.app` + `signfinder.app`).
+`deploy.yml`/`deploy-prod.yml` деплоят через `projectId` + `channelId: live`
+без явного `site` — то есть в default site, который существует. Менять
+workflow не нужно. `signfinder-c1163` — легаси, в него ничего не деплоится.
+
+**Что затронуто, если будет создан новый проект** — третья среда,
+пересборка прода с нуля (DR), переезд под оформленное юрлицо в Грузии,
+Terraform-лаба:
+
+```powershell
+firebase hosting:sites:create <site-id> --project=<project-id>
+```
+
+`<site-id>` = `<project-id>`, если поддомен свободен. Если он занят другим
+проектом — брать уникальный, но тогда деплой в default site не попадёт:
+потребуется `target` в `firebase.json`/`.firebaserc` (детали сверять с
+документацией Firebase на момент создания, не по этому файлу). REST-аналог:
+`POST https://firebasehosting.googleapis.com/v1beta1/projects/<project-id>/sites?siteId=<site-id>`.
+
+Порядок для нового проекта: создать проект → `sites:create` → Auth/Web App
+→ первый `firebase deploy` → кастомный домен (DNS-часть — как в
+`ENVIRONMENTS_AND_COST.md`, Cloudflare «DNS only»). В Terraform — явный
+ресурс сайта (`google_firebase_hosting_site`, провайдер `google-beta`;
+имя ресурса сверить по документации), а не расчёт на побочный эффект от
+создания Web App.
+
+Кто делает: владелец, один раз, при создании проекта — как и остальной
+provisioning в этом файле. Не CI и не кодер.
+
+Проверка: `firebase hosting:sites:list --project=<project-id>` показывает
+сайт, первый деплой не даёт 404.
+
+---
+
 ## См. также
 
+- `ENVIRONMENTS_AND_COST.md` — какие среды существуют, их ID/домены/DNS
 - `SECRETS_REGISTRY.md` — реестр: что уже заведено, где лежит, политика ротации, что делать при утечке
 - `GIT_WORKFLOW.md` §Явные запреты — что агент не делает никогда (руками секреты не передавать)
 - `TASK_e5_scheduler_auth_followup.md` — открытый кейс с Cloud Scheduler auth

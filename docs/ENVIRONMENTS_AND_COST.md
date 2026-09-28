@@ -183,6 +183,16 @@ gcloud secrets versions access latest --secret=<имя> --project=signfinder-pro
 
 ---
 
+## Внешние изменения платформы, влияющие на bootstrap новых проектов
+
+- **Firebase Hosting, 2026-10-15** — у новых проектов default Hosting site
+  больше не создаётся автоматически. На `signfinder-cab-test` и
+  `signfinder-prod` (созданы раньше, default site есть) **не влияет**.
+  При создании любого нового проекта — `firebase hosting:sites:create`
+  явно, см. `RUNBOOK_PROVISIONING.md` §7.
+
+---
+
 ## Free trial — когда кончается и что происходит
 
 - $300 кредита, действует **90 дней** от создания billing account (не от
